@@ -72,19 +72,8 @@ npm run dev          # → http://localhost:5173
 
 Until Firebase login is ready, the login page has **development buttons** to continue as any head or the CEO.
 
-## Team split
-
-| Area | Main files |
-|---|---|---|
-| Backend core: database, Firebase auth, reports API (submit / edit / list / detail) | `backend/src/config`, `middleware/authenticate.js`, `modules/auth`, `modules/reports` |
-| Head website + attachments + notifications | `frontend/src/pages/head`, `LoginPage.jsx`, `NotificationsPage.jsx`, `backend/src/modules/attachments`, `modules/notifications`, `jobs/` |
-| CEO website + CEO API | `frontend/src/pages/ceo`, `ReportDetailPage.jsx`, `backend/src/modules/dashboard`, review endpoint |
-
-Every file has an `Owner:` comment and `TODO:` notes describing what to build.
-
 ## Progress
 - [x] Project structure
-- [ ] Choose database
 - [ ] Firebase project + 5 user accounts
 - [ ] Login (Firebase)
 - [ ] Head: submit / edit / history
