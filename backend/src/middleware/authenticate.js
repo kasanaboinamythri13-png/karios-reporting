@@ -1,12 +1,16 @@
-// ============================================================
-// Karios Backend — Authentication Middleware
-// Verifies Firebase JWT or Dev Token, loads user from Neon DB
-// ============================================================
 import { Unauthorized } from '../utils/errors.js';
 import { query } from '../config/db.js';
 import { env } from '../config/env.js';
 import { auth as firebaseAuth } from '../config/firebase.js';
 
+// Verifies the Firebase ID token and attaches the user from the database to req.user.
+// Owner: Member 1
+//
+// TODO:
+//   1. Read "Authorization: Bearer <token>"
+//   2. auth.verifyIdToken(token)
+//   3. Load the user from the DB by firebaseUid; reject if missing or inactive
+//   4. req.user = { id, role, department, title }
 export async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization || '';
 

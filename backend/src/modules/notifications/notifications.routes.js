@@ -1,11 +1,9 @@
-// ============================================================
-// Karios Backend — Notifications Routes
-// ============================================================
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate.js';
 import { query } from '../../config/db.js';
 import { NotFound } from '../../utils/errors.js';
 
+// Owner: Member 2
 const router = Router();
 
 router.use(authenticate);

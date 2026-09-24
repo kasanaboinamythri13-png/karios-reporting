@@ -1,6 +1,14 @@
-// ============================================================
-// Karios Backend — Database Connection Pool (PostgreSQL / Neon)
-// ============================================================
+// Database connection.
+// Owner: Member 1
+//
+// Tables / collections needed (see docs/WEB_REQUIREMENTS.md):
+//   users          — firebaseUid, email, role (HEAD | CEO), department, title (no personal names)
+//   reports        — userId, department, reportDate (IST "YYYY-MM-DD"), data, status,
+//                    reviewedBy, reviewedAt, reviewComment
+//                    UNIQUE (userId, reportDate)  ← one report per day
+//   attachments    — reportId, storagePath, fileName, mimeType, sizeBytes
+//   notifications  — userId, type, title, body, reportId, isRead
+
 import pg from 'pg';
 import { env } from './env.js';
 
