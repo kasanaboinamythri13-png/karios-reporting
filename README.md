@@ -13,7 +13,7 @@ Full requirements: [docs/WEB_REQUIREMENTS.md](docs/WEB_REQUIREMENTS.md) · API: 
 | Frontend | React + Vite + React Router |
 | Backend | Node.js + Express |
 | Login | Firebase Authentication |
-| Database | **To be decided** (PostgreSQL / MongoDB) |
+| Database | (PostgreSQL) |
 
 ## Folder structure
 ```
