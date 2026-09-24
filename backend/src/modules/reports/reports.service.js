@@ -1,7 +1,8 @@
-// ============================================================
-// Karios Backend — Reports Service
-// Handles report creation, same-day editing, filtering, and CEO review
-// ============================================================
+// Business rules for reports (one per day, same-day edit, review status changes).
+// Owner: Member 1 (submit / edit / list), Member 3 (review)
+//
+// Always use todayIST() from utils/date.js — never new Date() directly — to decide "today".
+
 import { query, getClient } from '../../config/db.js';
 import { getTodayIST } from '../../utils/date.js';
 import { BadRequest, NotFound, Forbidden, Conflict } from '../../utils/errors.js';
