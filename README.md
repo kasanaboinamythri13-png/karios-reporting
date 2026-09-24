@@ -74,11 +74,11 @@ Until Firebase login is ready, the login page has **development buttons** to con
 
 ## Team split
 
-| Member | Area | Main files |
+| Area | Main files |
 |---|---|---|
-| **Member 1** | Backend core: database, Firebase auth, reports API (submit / edit / list / detail) | `backend/src/config`, `middleware/authenticate.js`, `modules/auth`, `modules/reports` |
-| **Member 2** | Head website + attachments + notifications | `frontend/src/pages/head`, `LoginPage.jsx`, `NotificationsPage.jsx`, `backend/src/modules/attachments`, `modules/notifications`, `jobs/` |
-| **Member 3** | CEO website + CEO API | `frontend/src/pages/ceo`, `ReportDetailPage.jsx`, `backend/src/modules/dashboard`, review endpoint |
+| Backend core: database, Firebase auth, reports API (submit / edit / list / detail) | `backend/src/config`, `middleware/authenticate.js`, `modules/auth`, `modules/reports` |
+| Head website + attachments + notifications | `frontend/src/pages/head`, `LoginPage.jsx`, `NotificationsPage.jsx`, `backend/src/modules/attachments`, `modules/notifications`, `jobs/` |
+| CEO website + CEO API | `frontend/src/pages/ceo`, `ReportDetailPage.jsx`, `backend/src/modules/dashboard`, review endpoint |
 
 Every file has an `Owner:` comment and `TODO:` notes describing what to build.
 
