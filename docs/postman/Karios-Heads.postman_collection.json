@@ -1,0 +1,415 @@
+{
+  "info": {
+    "name": "Karios - Department Heads API",
+    "description": "Manual tests for the Department Heads backend. Run the folders in order (1 → 7). Start the backend with `npm run dev` and use a fresh database (`npm run db:reset`). Uses development logins, so backend/.env must have ALLOW_DEV_TOKENS=true.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000/api" },
+    { "key": "headToken", "value": "dev-finance" },
+    { "key": "ceoToken", "value": "dev-ceo" },
+    { "key": "reportId", "value": "" },
+    { "key": "otherReportId", "value": "" },
+    { "key": "approvedReportId", "value": "" },
+    { "key": "notificationId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Setup & login",
+      "item": [
+        {
+          "name": "Health check (no login) → 200",
+          "request": { "method": "GET", "url": "{{baseUrl}}/health" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }]
+        },
+        {
+          "name": "Who am I → Finance Head",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": "{{baseUrl}}/me"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('title is Finance Head', () => pm.expect(pm.response.json().title).to.eql('Finance Head'));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "2. Form & today",
+      "item": [
+        {
+          "name": "Form fields for my department",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": "{{baseUrl}}/reports/form-schema"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('FINANCE form', () => pm.expect(pm.response.json().department).to.eql('FINANCE'));"
+          ] } }]
+        },
+        {
+          "name": "Today's report → null (not submitted yet)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": "{{baseUrl}}/reports/today"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('report is null', () => pm.expect(pm.response.json().report).to.eql(null));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "3. Submit",
+      "item": [
+        {
+          "name": "Submit INVALID data → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{headToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"collections\": -50,\n    \"expenses\": \"lots\",\n    \"department\": \"SALES\"\n  }\n}" },
+            "url": "{{baseUrl}}/reports"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }]
+        },
+        {
+          "name": "Submit VALID report → 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{headToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"collections\": 5400.75,\n    \"paymentsMade\": 2100,\n    \"expenses\": 1200,\n    \"pendingInvoices\": 3,\n    \"cashPosition\": 48000,\n    \"blockers\": \"Two invoices overdue\",\n    \"notes\": \"Quarter close next week\"\n  }\n}" },
+            "url": "{{baseUrl}}/reports"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 Created', () => pm.response.to.have.status(201));",
+            "const report = pm.response.json().report;",
+            "pm.collectionVariables.set('reportId', report.id);",
+            "pm.test('status SUBMITTED', () => pm.expect(report.status).to.eql('SUBMITTED'));"
+          ] } }]
+        },
+        {
+          "name": "Submit AGAIN same day → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{headToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": { \"collections\": 100 }\n}" },
+            "url": "{{baseUrl}}/reports"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+          ] } }]
+        },
+        {
+          "name": "Today's report → my report, canEdit true",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": "{{baseUrl}}/reports/today"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('canEdit true', () => pm.expect(pm.response.json().canEdit).to.eql(true));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "4. Edit, history & detail",
+      "item": [
+        {
+          "name": "Edit my report (same day) → 200",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{headToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"collections\": 6000,\n    \"expenses\": 900,\n    \"blockers\": \"One invoice overdue\"\n  }\n}" },
+            "url": "{{baseUrl}}/reports/{{reportId}}"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }]
+        },
+        {
+          "name": "My report history",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": { "raw": "{{baseUrl}}/reports?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["reports"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "20" }] }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('only FINANCE reports', () => pm.response.json().data.forEach(r => pm.expect(r.department).to.eql('FINANCE')));"
+          ] } }]
+        },
+        {
+          "name": "History filtered by status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": { "raw": "{{baseUrl}}/reports?status=SUBMITTED", "host": ["{{baseUrl}}"], "path": ["reports"], "query": [{ "key": "status", "value": "SUBMITTED" }] }
+          }
+        },
+        {
+          "name": "My report detail",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": "{{baseUrl}}/reports/{{reportId}}"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "5. Security checks",
+      "item": [
+        {
+          "name": "No login → 401",
+          "request": { "method": "GET", "url": "{{baseUrl}}/reports/today" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }]
+        },
+        {
+          "name": "(setup) Get Sales Head's report id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer dev-sales" }],
+            "url": "{{baseUrl}}/reports/today"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.collectionVariables.set('otherReportId', pm.response.json().report.id);"
+          ] } }]
+        },
+        {
+          "name": "View another head's report → 404",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": "{{baseUrl}}/reports/{{otherReportId}}"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ] } }]
+        },
+        {
+          "name": "Edit another head's report → 404",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{headToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": { \"collections\": 1 }\n}" },
+            "url": "{{baseUrl}}/reports/{{otherReportId}}"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ] } }]
+        },
+        {
+          "name": "(setup) Get Marketing Head's APPROVED report id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer dev-marketing" }],
+            "url": "{{baseUrl}}/reports/today"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.collectionVariables.set('approvedReportId', pm.response.json().report.id);"
+          ] } }]
+        },
+        {
+          "name": "Edit an APPROVED report → 403",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer dev-marketing" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": { \"activeCampaigns\": 3 }\n}" },
+            "url": "{{baseUrl}}/reports/{{approvedReportId}}"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }]
+        },
+        {
+          "name": "CEO on a head-only endpoint → 403",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ceoToken}}" }],
+            "url": "{{baseUrl}}/reports/today"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }]
+        },
+        {
+          "name": "Bad report id → 404 (not a crash)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": "{{baseUrl}}/reports/abc123"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "6. Rejected report & notifications",
+      "item": [
+        {
+          "name": "(CEO helper) Reject my report",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ceoToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"REJECTED\",\n  \"comment\": \"Please add the expense breakdown\"\n}" },
+            "url": "{{baseUrl}}/reports/{{reportId}}/review"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }]
+        },
+        {
+          "name": "My notifications → CEO rejected",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": "{{baseUrl}}/notifications"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const n = pm.response.json().notifications[0];",
+            "if (n) pm.collectionVariables.set('notificationId', n.id);"
+          ] } }]
+        },
+        {
+          "name": "Today's report → REJECTED with CEO comment",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": "{{baseUrl}}/reports/today"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('status REJECTED', () => pm.expect(pm.response.json().report.status).to.eql('REJECTED'));"
+          ] } }]
+        },
+        {
+          "name": "Fix the rejected report → back to SUBMITTED",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{headToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"data\": {\n    \"collections\": 6000,\n    \"expenses\": 900,\n    \"notes\": \"Expenses: travel 400, software 500\"\n  }\n}" },
+            "url": "{{baseUrl}}/reports/{{reportId}}"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('status SUBMITTED', () => pm.expect(pm.response.json().report.status).to.eql('SUBMITTED'));"
+          ] } }]
+        },
+        {
+          "name": "Mark one notification read",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": "{{baseUrl}}/notifications/{{notificationId}}/read"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }]
+        },
+        {
+          "name": "Mark all notifications read",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{headToken}}" }],
+            "url": "{{baseUrl}}/notifications/read-all"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "7. Attachments",
+      "item": [
+        {
+          "name": "Ask for upload link (valid PDF)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{headToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fileName\": \"invoice.pdf\",\n  \"mimeType\": \"application/pdf\",\n  \"sizeBytes\": 20480\n}" },
+            "url": "{{baseUrl}}/attachments/upload-url"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201 (Firebase set up) or 503 (Firebase not set up yet)', () => pm.expect(pm.response.code).to.be.oneOf([201, 503]));"
+          ] } }]
+        },
+        {
+          "name": "Upload link for .exe → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{headToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fileName\": \"virus.exe\",\n  \"mimeType\": \"application/x-msdownload\",\n  \"sizeBytes\": 2048\n}" },
+            "url": "{{baseUrl}}/attachments/upload-url"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }]
+        },
+        {
+          "name": "Upload link for 20 MB file → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{headToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fileName\": \"huge.pdf\",\n  \"mimeType\": \"application/pdf\",\n  \"sizeBytes\": 20971520\n}" },
+            "url": "{{baseUrl}}/attachments/upload-url"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }]
+        }
+      ]
+    }
+  ]
+}

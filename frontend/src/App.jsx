@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext.jsx';
 import RoleRoute from './auth/RoleRoute.jsx';
+import { isCeo } from './auth/roles.js';
 import Layout from './components/Layout.jsx';
+import { Loading } from './components/Feedback.jsx';
 
 import LoginPage from './pages/LoginPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
@@ -18,9 +20,10 @@ import NotificationsPage from './pages/shared/NotificationsPage.jsx';
 import ProfilePage from './pages/shared/ProfilePage.jsx';
 
 function HomeRedirect() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) return <Loading full />;
   if (!user) return <Navigate to="/login" replace />;
-  return <Navigate to={user.role === 'CEO' ? '/ceo' : '/head'} replace />;
+  return <Navigate to={isCeo(user) ? '/ceo' : '/head'} replace />;
 }
 
 export default function App() {
