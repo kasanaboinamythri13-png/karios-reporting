@@ -14,6 +14,11 @@ import { env } from './env.js';
 
 const { Pool } = pg;
 
+// Return DATE columns (e.g. report_date) as plain "YYYY-MM-DD" strings.
+// By default pg turns them into JS Dates at local midnight, which shifts the day
+// when converted to UTC (on an IST machine "2026-09-24" became "2026-09-23T18:30Z").
+pg.types.setTypeParser(pg.types.builtins.DATE, (value) => value);
+
 export const pool = new Pool({
   connectionString: env.databaseUrl,
   ssl: {

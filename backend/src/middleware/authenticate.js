@@ -20,8 +20,10 @@ export async function authenticate(req, res, next) {
 
   const token = authHeader.split('Bearer ')[1].trim();
 
-  // 1. Dev Token Bypass (Convenient for Local Android / React testing)
-  if (token.startsWith('dev-') || token.startsWith('mock-')) {
+  // 1. Dev Token Bypass (for local web testing and Postman)
+  // Only when ALLOW_DEV_TOKENS=true in .env — never set it on the live server,
+  // otherwise anyone could send "Bearer dev-ceo" and act as the CEO.
+  if (env.allowDevTokens && (token.startsWith('dev-') || token.startsWith('mock-'))) {
     const roleSlug = token.replace(/^(dev-|mock-)/, '').toLowerCase();
     
     let roleQuery = "role = 'CEO'";
@@ -45,37 +47,50 @@ export async function authenticate(req, res, next) {
   }
 
   // 2. Firebase ID Token Verification
+  if (!firebaseAuth) {
+    return next(Unauthorized('Firebase Admin not configured. Use dev token (e.g. Bearer dev-ceo) for development.'));
+  }
+
+  let uid;
+  let email;
   try {
-    if (!firebaseAuth) {
-      return next(Unauthorized('Firebase Admin not configured. Use dev token (e.g. Bearer dev-ceo) for development.'));
+    ({ uid, email } = await firebaseAuth.verifyIdToken(token));
+  } catch (error) {
+    if (error.code === 'auth/id-token-expired') {
+      return next(Unauthorized('Firebase token has expired'));
     }
+    return next(Unauthorized('Invalid authentication token: ' + error.message));
+  }
 
-    const decodedToken = await firebaseAuth.verifyIdToken(token);
-    const { uid, email } = decodedToken;
-
-    // Fetch user from Neon PostgreSQL
-    let result = await query('SELECT id, email, role, department, title, is_active FROM users WHERE firebase_uid = $1 OR email = $2 LIMIT 1;', [uid, email]);
+  // Database errors are real server errors (500), not "invalid token" — so they're outside the try above.
+  try {
+    // Fetch user from Neon PostgreSQL (first login: matched by email, then by firebase_uid)
+    const result = await query(
+      `SELECT id, email, role, department, title, is_active, firebase_uid
+       FROM users
+       WHERE firebase_uid = $1 OR lower(email) = lower($2)
+       ORDER BY (firebase_uid = $1) DESC NULLS LAST
+       LIMIT 1;`,
+      [uid, email ?? ''],
+    );
 
     if (result.rows.length === 0) {
       return next(Unauthorized('User account not provisioned in database. Contact administrator.'));
     }
 
-    const user = result.rows[0];
+    const { firebase_uid: linkedUid, ...user } = result.rows[0];
     if (!user.is_active) {
       return next(Unauthorized('User account is deactivated'));
     }
 
-    // Attach firebase_uid if not yet linked
-    if (!user.firebase_uid) {
+    // Attach firebase_uid on the first login only
+    if (!linkedUid) {
       await query('UPDATE users SET firebase_uid = $1 WHERE id = $2;', [uid, user.id]);
     }
 
     req.user = user;
     return next();
   } catch (error) {
-    if (error.code === 'auth/id-token-expired') {
-      return next(Unauthorized('Firebase token has expired'));
-    }
-    return next(Unauthorized('Invalid authentication token: ' + error.message));
+    return next(error);
   }
 }

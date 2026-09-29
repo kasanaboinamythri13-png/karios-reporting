@@ -8,7 +8,14 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "test": "node --test"
+    "test": "node --test tests/*.test.js",
+    "test:ceo": "node tests/test-ceo-endpoints.js",
+    "test:heads": "node tests/test-heads-endpoints.js",
+    "db:check": "node src/scripts/checkDb.js",
+    "db:migrate":"node src/scripts/migrate.js",
+    "db:reset": "node src/scripts/migrate.js --reset --sample",
+    "reminder:run": "node src/scripts/sendReminders.js",
+    "firebase:key": "node src/scripts/setFirebaseKey.js"
   },
   "engines": {
     "node": ">=20"
@@ -19,6 +26,7 @@
     "express": "^5.2.1",
     "firebase-admin": "^14.5.0",
     "helmet": "^8.3.0",
+    "node-cron": "^4.6.0",
     "pg": "^8.23.0",
     "zod": "^4.6.5"
   },

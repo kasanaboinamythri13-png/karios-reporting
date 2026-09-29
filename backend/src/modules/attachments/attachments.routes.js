@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireRole } from '../../middleware/requireRole.js';
-import { NotImplemented } from '../../utils/errors.js';
+import * as attachmentsService from './attachments.service.js';
 
 // Owner: Member 2
 // Rules: JPG / PNG / PDF only, max 10 MB each, max 5 per report.
@@ -10,14 +10,17 @@ const router = Router();
 
 router.use(authenticate);
 
-// POST /api/attachments/upload-url  Body: { fileName, mimeType, sizeBytes } → { attachmentId, uploadUrl }
+// POST /api/attachments/upload-url  Body: { fileName, mimeType, sizeBytes }
+// → { attachmentId, uploadUrl, method: 'PUT', headers, expiresAt }
 router.post('/upload-url', requireRole('HEAD'), async (req, res) => {
-  throw NotImplemented();
+  const result = await attachmentsService.createUploadUrl(req.user, req.body);
+  res.status(201).json(result);
 });
 
-// GET /api/attachments/:id/url → { url } (valid ~5 min). Owner of the report or CEO only.
+// GET /api/attachments/:id/url → { url, fileName, expiresAt } (valid 5 min). Owner of the report or CEO only.
 router.get('/:id/url', requireRole('HEAD', 'CEO'), async (req, res) => {
-  throw NotImplemented();
+  const result = await attachmentsService.createDownloadUrl(req.user, req.params.id);
+  res.json(result);
 });
 
 export default router;

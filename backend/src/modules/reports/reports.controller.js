@@ -2,15 +2,18 @@
 // Business rules go in reports.service.js.
 
 import * as reportsService from './reports.service.js';
-import { getTodayIST } from '../../utils/date.js';
+import { getFormFields } from './formFields.js';
 
-// GET /api/reports/today → today's (IST) report for the logged-in head, or null
+// GET /api/reports/form-schema → { department, fields } for the logged-in head's form
+export async function getFormSchema(req, res) {
+  res.json({ department: req.user.department, fields: getFormFields(req.user.department) || [] });
+}
+
+// GET /api/reports/today → { date, report | null, canEdit } for the logged-in head
 export async function getToday(req, res, next) {
   try {
-    const today = getTodayIST();
-    const result = await reportsService.listReports(req.user, { from: today, to: today, limit: 1 });
-    const report = result.data.length > 0 ? result.data[0] : null;
-    res.json({ report, date: today });
+    const result = await reportsService.getTodayReport(req.user);
+    res.json(result);
   } catch (err) {
     next(err);
   }

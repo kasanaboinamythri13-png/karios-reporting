@@ -6,6 +6,10 @@ export const env = {
   corsOrigin: (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',').map((o) => o.trim()),
   timezone: process.env.APP_TIMEZONE || 'Asia/Kolkata',
   databaseUrl: process.env.DATABASE_URL,
+  // "Bearer dev-sales" style test logins. Must stay false on the live server.
+  allowDevTokens: process.env.ALLOW_DEV_TOKENS === 'true',
+  // When the daily reminder runs (cron format, IST). Default: every day at 18:00.
+  reminderCron: process.env.REMINDER_CRON || '0 18 * * *',
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
