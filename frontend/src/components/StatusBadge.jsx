@@ -1,11 +1,12 @@
+// Status as a colored dot + text (see the design): ● Approved
 const LABELS = {
   NOT_SUBMITTED: 'Not submitted',
-  SUBMITTED: 'Submitted',
+  SUBMITTED: 'Pending review',
   APPROVED: 'Approved',
   REJECTED: 'Rejected',
-  MISSING: 'Missing',
+  MISSING: 'Not submitted',
 };
 
 export default function StatusBadge({ status }) {
-  return <span className={`badge badge-${status.toLowerCase()}`}>{LABELS[status] || status}</span>;
+  return <span className={`status status-${status.toLowerCase()}`}>{LABELS[status] || status}</span>;
 }
