@@ -3,12 +3,18 @@
 // Handles incoming requests for report CRUD and review workflows
 // ============================================================
 import * as reportsService from './reports.service.js';
+import { getFormFields } from './formFields.js';
+
+// GET /api/reports/form-schema → { department, fields } for the logged-in head's form
+export async function getFormSchema(req, res) {
+  res.json({ department: req.user.department, fields: getFormFields(req.user.department) || [] });
+}
 
 // GET /api/reports/today → today's (IST) report for the logged-in head, or null
 export async function getToday(req, res, next) {
   try {
-    const report = await reportsService.getTodayReport(req.user);
-    res.json(report);
+    const result = await reportsService.getTodayReport(req.user);
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -44,11 +50,15 @@ export async function list(req, res, next) {
   }
 }
 
-// GET /api/reports/:id → owner or CEO only (404 / 403 for anyone else)
+// GET /api/reports/:id → owner or CEO only
 export async function getById(req, res, next) {
   try {
     const report = await reportsService.getReportById(req.params.id, req.user);
-    res.json(report);
+    if (!report) {
+      return res.status(404).json({ error: { message: 'Report not found' } });
+    }
+    // Provide both top-level and nested structure for maximum compatibility
+    res.json(report.report ? report : { report, ...report });
   } catch (err) {
     next(err);
   }

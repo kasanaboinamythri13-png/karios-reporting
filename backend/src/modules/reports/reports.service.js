@@ -3,8 +3,15 @@
 // Handles report creation, editing, filtering, and CEO review
 // ============================================================
 import { query, getClient } from '../../config/db.js';
-import { todayIST, getTodayIST } from '../../utils/date.js';
+import { getTodayIST } from '../../utils/date.js';
 import { BadRequest, NotFound, Forbidden, Conflict } from '../../utils/errors.js';
+import { isUuid, isDateString } from '../../utils/validators.js';
+import { validateReportData, extractSummaryColumns } from './reports.validation.js';
+import { linkAttachments } from '../attachments/attachments.service.js';
+import { notifyCeosAboutReport } from '../notifications/notifications.service.js';
+
+const STATUSES = ['SUBMITTED', 'APPROVED', 'REJECTED'];
+const MAX_PAGE_SIZE = 100;
 
 export function formatReport(row) {
   if (!row) return null;
@@ -43,11 +50,39 @@ export function formatReport(row) {
 }
 
 /**
+ * Runs `work(client)` inside one database transaction:
+ * either every change is saved, or (on any error) none of them are.
+ */
+async function inTransaction(work) {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * List reports with role-based isolation and filters
  */
 export async function listReports(user, filters = {}) {
-  const { department, status, from, to, page = 1, limit = 100 } = filters;
-  const offset = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+  const { department, status, from, to } = filters;
+  const page = Math.max(1, parseInt(filters.page) || 1);
+  const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(filters.limit) || 100));
+  const offset = (page - 1) * limit;
+
+  if (status && !STATUSES.includes(String(status).toUpperCase())) {
+    throw BadRequest(`status must be one of ${STATUSES.join(', ')}`);
+  }
+  if ((from && !isDateString(from)) || (to && !isDateString(to))) {
+    throw BadRequest('from / to must be dates in YYYY-MM-DD format');
+  }
 
   const conditions = [];
   const params = [];
@@ -84,7 +119,7 @@ export async function listReports(user, filters = {}) {
   const countRes = await query(countSql, params);
   const total = parseInt(countRes.rows[0]?.total || '0');
 
-  // Fetch reports
+  // Fetch paginated reports
   const dataSql = `
     SELECT r.id, r.user_id, r.department, r.report_date, r.status,
            r.data, r.blockers, r.revenue_closed, r.marketing_spend, r.leads, r.collections,
@@ -104,7 +139,7 @@ export async function listReports(user, filters = {}) {
     LIMIT $${paramIdx++} OFFSET $${paramIdx++};
   `;
 
-  params.push(parseInt(limit), offset);
+  params.push(limit, offset);
   const dataRes = await query(dataSql, params);
   const formatted = dataRes.rows.map(formatReport);
 
@@ -113,9 +148,9 @@ export async function listReports(user, filters = {}) {
     reports: formatted,
     pagination: {
       total,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      totalPages: Math.ceil(total / parseInt(limit)) || 1,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
     },
   };
 }
@@ -124,6 +159,10 @@ export async function listReports(user, filters = {}) {
  * Get detailed report by ID
  */
 export async function getReportById(reportId, user) {
+  if (isUuid && !isUuid(reportId)) {
+    throw NotFound('Report not found');
+  }
+
   const sql = `
     SELECT r.id, r.user_id, r.department, r.report_date, r.status,
            r.data, r.blockers, r.revenue_closed, r.marketing_spend, r.leads, r.collections,
@@ -150,7 +189,7 @@ export async function getReportById(reportId, user) {
 
   // RBAC check: non-CEO can only view own reports
   if (user.role !== 'CEO' && report.user_id !== user.id) {
-    throw Forbidden('You do not have permission to view this report');
+    throw NotFound('Report not found');
   }
 
   return formatReport(report);
@@ -160,7 +199,7 @@ export async function getReportById(reportId, user) {
  * Get today's report for the authenticated head
  */
 export async function getTodayReport(user) {
-  const today = todayIST();
+  const today = getTodayIST();
   const sql = `
     SELECT r.id, r.user_id, r.department, r.report_date, r.status,
            r.data, r.blockers, r.revenue_closed, r.marketing_spend, r.leads, r.collections,
@@ -181,165 +220,137 @@ export async function getTodayReport(user) {
 
   const res = await query(sql, [user.id, today]);
   if (res.rows.length === 0) {
-    return null;
+    return { date: today, report: null, canEdit: false };
   }
-  return formatReport(res.rows[0]);
+  const report = formatReport(res.rows[0]);
+  return { date: today, report, canEdit: report.status !== 'APPROVED', ...report };
 }
 
 /**
  * Submit today's daily report (Department Head)
  */
 export async function submitDailyReport(user, payload) {
-  const today = todayIST();
-  const dept = payload.department || user.department;
+  const reportDate = getTodayIST();
+  const department = user.department || payload?.department;
 
-  // Check if already submitted today
-  const existing = await query('SELECT id FROM reports WHERE user_id = $1 AND report_date = $2::date;', [user.id, today]);
-  if (existing.rows.length > 0) {
-    throw Conflict(`Daily report for ${today} has already been submitted.`);
-  }
+  const data = payload?.data ? validateReportData(department, payload.data) : payload;
+  const columns = extractSummaryColumns ? extractSummaryColumns(department, data) : {
+    blockers: payload.blockers || null,
+    revenue_closed: Number(payload.revenue_closed || payload.revenueClosed || 0),
+    marketing_spend: Number(payload.marketing_spend || payload.spend || 0),
+    leads: Number(payload.leads || payload.newLeads || 0),
+    collections: Number(payload.collections || 0),
+  };
 
-  const blockers = payload.blockers || null;
-  const revenueClosed = Number(payload.revenue_closed || payload.revenueClosed || 0);
-  const marketingSpend = Number(payload.marketing_spend || payload.spend || 0);
-  const leads = Number(payload.leads || payload.newLeads || 0);
-  const collections = Number(payload.collections || 0);
+  const reportId = await inTransaction(async (client) => {
+    const inserted = await client.query(
+      `INSERT INTO reports (user_id, department, report_date, status, data,
+                            blockers, revenue_closed, marketing_spend, leads, collections)
+       VALUES ($1, $2, $3::date, 'SUBMITTED', $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (user_id, report_date) DO NOTHING
+       RETURNING id;`,
+      [
+        user.id,
+        department,
+        reportDate,
+        JSON.stringify(data),
+        columns.blockers,
+        columns.revenue_closed,
+        columns.marketing_spend,
+        columns.leads,
+        columns.collections,
+      ],
+    );
 
-  const insertSql = `
-    INSERT INTO reports (user_id, department, report_date, status, data, blockers, revenue_closed, marketing_spend, leads, collections)
-    VALUES ($1, $2, $3::date, 'SUBMITTED', $4, $5, $6, $7, $8, $9)
-    RETURNING *;
-  `;
-
-  const result = await query(insertSql, [
-    user.id,
-    dept,
-    today,
-    JSON.stringify(payload),
-    blockers,
-    revenueClosed,
-    marketingSpend,
-    leads,
-    collections,
-  ]);
-
-  const newReport = result.rows[0];
-
-  // Notify CEO that a department head submitted a report
-  try {
-    const ceoRes = await query(`SELECT id FROM users WHERE role = 'CEO' LIMIT 1;`);
-    if (ceoRes.rows.length > 0) {
-      const ceoId = ceoRes.rows[0].id;
-      const headName = user.title || `${dept} Head`;
-      await query(
-        `INSERT INTO notifications (user_id, type, title, body, report_id)
-         VALUES ($1, $2, $3, $4, $5);`,
-        [
-          ceoId,
-          'REPORT_SUBMITTED',
-          `New Daily Report: ${dept}`,
-          `${headName} submitted the daily report for ${today}.`,
-          newReport.id,
-        ]
-      );
+    if (inserted.rows.length === 0) {
+      throw Conflict(`Daily report for ${reportDate} has already been submitted.`);
     }
-  } catch (notifErr) {
-    console.error('[Notification] Failed to create notification for CEO:', notifErr.message);
-  }
+    const id = inserted.rows[0].id;
 
-  return formatReport(newReport);
+    if (Array.isArray(payload?.attachmentIds) && linkAttachments) {
+      await linkAttachments(client, { reportId: id, userId: user.id, attachmentIds: payload.attachmentIds });
+    }
+
+    if (notifyCeosAboutReport) {
+      await notifyCeosAboutReport(client, { headTitle: user.title, reportId: id, reportDate });
+    }
+    return id;
+  });
+
+  return getReportById(reportId, user);
 }
 
 /**
  * Update today's report (Same-day edit only, not if approved)
  */
 export async function updateDailyReport(reportId, user, payload) {
-  const today = todayIST();
-
-  const current = await query('SELECT * FROM reports WHERE id = $1::uuid;', [reportId]);
-  if (current.rows.length === 0) {
+  if (isUuid && !isUuid(reportId)) {
     throw NotFound('Report not found');
   }
 
-  const report = current.rows[0];
-
-  // Owner check
-  if (report.user_id !== user.id) {
-    throw Forbidden('You can only edit your own reports');
-  }
-
-  // Same-day check (IST)
-  const reportDateStr = new Date(report.report_date).toISOString().split('T')[0];
-  if (reportDateStr !== today) {
-    throw Forbidden('Past reports cannot be modified. Only same-day edits are allowed.');
-  }
-
-  // Approved check
-  if (report.status === 'APPROVED') {
-    throw Forbidden('Approved reports cannot be edited.');
-  }
-
-  const blockers = payload.blockers !== undefined ? payload.blockers : report.blockers;
-  const revenueClosed = payload.revenue_closed !== undefined ? Number(payload.revenue_closed) : report.revenue_closed;
-  const marketingSpend = payload.marketing_spend !== undefined ? Number(payload.marketing_spend) : report.marketing_spend;
-  const leads = payload.leads !== undefined ? Number(payload.leads) : report.leads;
-  const collections = payload.collections !== undefined ? Number(payload.collections) : report.collections;
-
-  const mergedData = {
-    ...(typeof report.data === 'object' && report.data !== null ? report.data : {}),
-    ...payload,
+  const today = getTodayIST();
+  const data = payload?.data ? validateReportData(user.department, payload.data) : payload;
+  const columns = extractSummaryColumns ? extractSummaryColumns(user.department, data) : {
+    blockers: payload.blockers,
+    revenue_closed: payload.revenue_closed,
+    marketing_spend: payload.marketing_spend,
+    leads: payload.leads,
+    collections: payload.collections,
   };
 
-  const updateSql = `
-    UPDATE reports
-    SET data = $1,
-        blockers = $2,
-        revenue_closed = $3,
-        marketing_spend = $4,
-        leads = $5,
-        collections = $6,
-        status = 'SUBMITTED',
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = $7::uuid
-    RETURNING *;
-  `;
+  await inTransaction(async (client) => {
+    const current = await client.query(
+      'SELECT id, report_date, status FROM reports WHERE id = $1 AND user_id = $2 FOR UPDATE;',
+      [reportId, user.id],
+    );
+    const report = current.rows[0];
 
-  const updated = await query(updateSql, [
-    JSON.stringify(mergedData),
-    blockers,
-    revenueClosed,
-    marketingSpend,
-    leads,
-    collections,
-    reportId,
-  ]);
-
-  const updatedReport = updated.rows[0];
-
-  // Notify CEO if report was resubmitted/updated
-  try {
-    const ceoRes = await query(`SELECT id FROM users WHERE role = 'CEO' LIMIT 1;`);
-    if (ceoRes.rows.length > 0) {
-      const ceoId = ceoRes.rows[0].id;
-      const headName = user.title || `${report.department} Head`;
-      const isResubmit = report.status === 'REJECTED';
-      await query(
-        `INSERT INTO notifications (user_id, type, title, body, report_id)
-         VALUES ($1, $2, $3, $4, $5);`,
-        [
-          ceoId,
-          'REPORT_SUBMITTED',
-          isResubmit ? `Report Resubmitted: ${report.department}` : `Report Updated: ${report.department}`,
-          `${headName} ${isResubmit ? 'resubmitted' : 'updated'} their daily report.`,
-          reportId,
-        ]
-      );
+    if (!report) {
+      throw NotFound('Report not found');
     }
-  } catch (notifErr) {
-    console.error('[Notification] Failed to notify CEO on update:', notifErr.message);
-  }
+    const reportDateStr = new Date(report.report_date).toISOString().split('T')[0];
+    if (reportDateStr !== today && report.report_date !== today) {
+      throw Forbidden('Past reports cannot be modified. Only same-day edits are allowed.');
+    }
+    if (report.status === 'APPROVED') {
+      throw Forbidden('Approved reports cannot be edited.');
+    }
 
-  return formatReport(updatedReport);
+    await client.query(
+      `UPDATE reports
+       SET data = $1,
+           blockers = $2,
+           revenue_closed = $3,
+           marketing_spend = $4,
+           leads = $5,
+           collections = $6,
+           status = 'SUBMITTED',
+           reviewed_by = NULL,
+           reviewed_at = NULL,
+           review_comment = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $7;`,
+      [
+        JSON.stringify(data),
+        columns.blockers,
+        columns.revenue_closed,
+        columns.marketing_spend,
+        columns.leads,
+        columns.collections,
+        reportId,
+      ],
+    );
+
+    if (Array.isArray(payload?.attachmentIds) && linkAttachments) {
+      await linkAttachments(client, { reportId, userId: user.id, attachmentIds: payload.attachmentIds });
+    }
+
+    if (report.status === 'REJECTED' && notifyCeosAboutReport) {
+      await notifyCeosAboutReport(client, { headTitle: user.title, reportId, reportDate: today, resubmitted: true });
+    }
+  });
+
+  return getReportById(reportId, user);
 }
 
 /**
@@ -350,6 +361,10 @@ export async function reviewReport(reportId, ceoUser, decision) {
 
   if (!['APPROVED', 'REJECTED'].includes(status)) {
     throw BadRequest("Status must be either 'APPROVED' or 'REJECTED'");
+  }
+
+  if (status === 'REJECTED' && (!comment || comment.trim().length === 0)) {
+    throw BadRequest('A comment is required when rejecting a report');
   }
 
   const client = await getClient();
@@ -384,7 +399,7 @@ export async function reviewReport(reportId, ceoUser, decision) {
     const notifTitle = `Daily Report ${status === 'APPROVED' ? 'Approved' : 'Rejected'}`;
     const notifBody = status === 'APPROVED'
       ? (comment ? `CEO approved your ${report.department} daily report. Note: ${comment}` : `CEO approved your ${report.department} daily report.`)
-      : (comment ? `CEO rejected your ${report.department} daily report. Reason: ${comment}` : `CEO rejected your ${report.department} daily report.`);
+      : `CEO rejected your ${report.department} daily report. Reason: ${comment}`;
 
     await client.query(
       `INSERT INTO notifications (user_id, type, title, body, report_id)

@@ -3,7 +3,7 @@
 // Aggregates department report statuses, blockers, and KPI metrics
 // ============================================================
 import { query } from '../../config/db.js';
-import { todayIST, getTodayIST } from '../../utils/date.js';
+import { getTodayIST } from '../../utils/date.js';
 
 const DEPARTMENTS = [
   { department: 'DEVELOPMENT', title: 'Developer Head', role: 'DEVELOPER_HEAD' },
@@ -13,7 +13,7 @@ const DEPARTMENTS = [
 ];
 
 export async function getExecutiveOverview(targetDate) {
-  const dateStr = targetDate || todayIST();
+  const dateStr = targetDate || getTodayIST();
 
   // 1. Fetch all reports for the given date
   const reportsResult = await query(

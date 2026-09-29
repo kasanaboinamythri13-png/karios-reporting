@@ -8,6 +8,8 @@ const router = Router();
 router.use(authenticate);
 
 // Heads — Owner: Member 1
+// (fixed paths like /form-schema and /today must come before /:id)
+router.get('/form-schema', requireRole('HEAD'), controller.getFormSchema);
 router.get('/today', requireRole('HEAD'), controller.getToday);
 router.post('/', requireRole('HEAD'), controller.submit);
 router.patch('/:id', requireRole('HEAD'), controller.update);
