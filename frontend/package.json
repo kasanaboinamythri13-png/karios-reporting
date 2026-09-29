@@ -1,6 +1,6 @@
 {
   "name": "karios-reporting-frontend",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,13 +9,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "firebase": "^12.19.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "react-router-dom": "^7.18.4"
+    "axios": "^1.7.7",
+    "date-fns": "^3.6.0",
+    "firebase": "^10.14.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^6.1.1",
-    "vite": "^8.3.0"
+    "@vitejs/plugin-react": "^4.3.2",
+    "vite": "^5.4.8"
   }
 }

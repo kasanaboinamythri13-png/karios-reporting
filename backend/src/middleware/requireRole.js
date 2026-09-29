@@ -1,8 +1,15 @@
+// ============================================================
+// Karios Backend — Role-Based Access Control (RBAC)
+// ============================================================
 import { Forbidden } from '../utils/errors.js';
 
 const HEAD_ROLES = ['DEVELOPER_HEAD', 'SALES_HEAD', 'MARKETING_HEAD', 'FINANCE_HEAD', 'HEAD'];
 
-// Usage: router.get('/overview', authenticate, requireRole('CEO'), handler)
+/**
+ * RBAC middleware guard
+ * Usage: router.get('/overview', authenticate, requireRole('CEO'), handler)
+ *        router.get('/reports', authenticate, requireRole('HEAD', 'CEO'), handler)
+ */
 export function requireRole(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user) {

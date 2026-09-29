@@ -1,8 +1,7 @@
-// Business rules for reports (one per day, same-day edit, review status changes).
-// Owner: Member 1 (submit / edit / list), Member 3 (review)
-//
-// Always use todayIST() from utils/date.js — never new Date() directly — to decide "today".
-
+// ============================================================
+// Karios Backend — Reports Service
+// Handles report creation, editing, filtering, and CEO review
+// ============================================================
 import { query, getClient } from '../../config/db.js';
 import { getTodayIST } from '../../utils/date.js';
 import { BadRequest, NotFound, Forbidden, Conflict } from '../../utils/errors.js';
@@ -13,6 +12,42 @@ import { notifyCeosAboutReport } from '../notifications/notifications.service.js
 
 const STATUSES = ['SUBMITTED', 'APPROVED', 'REJECTED'];
 const MAX_PAGE_SIZE = 100;
+
+export function formatReport(row) {
+  if (!row) return null;
+  const data = typeof row.data === 'object' && row.data !== null ? row.data : {};
+  const dateStr = row.report_date instanceof Date
+    ? row.report_date.toISOString().split('T')[0]
+    : String(row.report_date || '').split('T')[0];
+
+  const headTitle = row.head_title || row.department_title || (
+    row.department ? `${row.department.charAt(0) + row.department.slice(1).toLowerCase()} Head` : 'Department Head'
+  );
+
+  return {
+    ...data,
+    ...row,
+    id: row.id,
+    user_id: row.user_id,
+    department: row.department,
+    department_title: headTitle,
+    head_title: headTitle,
+    report_date: dateStr,
+    status: row.status,
+    summary: data.summary || row.summary || '',
+    blockers: row.blockers || data.blockers || '',
+    revenue_closed: row.revenue_closed != null ? Number(row.revenue_closed) : (data.revenue_closed != null ? Number(data.revenue_closed) : 0),
+    marketing_spend: row.marketing_spend != null ? Number(row.marketing_spend) : (data.marketing_spend != null ? Number(data.marketing_spend) : 0),
+    leads: row.leads != null ? Number(row.leads) : (data.leads != null ? Number(data.leads) : 0),
+    collections: row.collections != null ? Number(row.collections) : (data.collections != null ? Number(data.collections) : 0),
+    reviewed_by: row.reviewed_by,
+    reviewed_at: row.reviewed_at,
+    review_comment: row.review_comment,
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
 
 /**
  * Runs `work(client)` inside one database transaction:
@@ -38,12 +73,10 @@ async function inTransaction(work) {
  */
 export async function listReports(user, filters = {}) {
   const { department, status, from, to } = filters;
-  // Keep page/limit sensible: page >= 1, 1 <= limit <= 100 (bad values fall back to defaults)
   const page = Math.max(1, parseInt(filters.page) || 1);
-  const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(filters.limit) || 20));
+  const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(filters.limit) || 100));
   const offset = (page - 1) * limit;
 
-  // Reject bad filters with 400 instead of letting PostgreSQL fail with a 500
   if (status && !STATUSES.includes(String(status).toUpperCase())) {
     throw BadRequest(`status must be one of ${STATUSES.join(', ')}`);
   }
@@ -59,22 +92,22 @@ export async function listReports(user, filters = {}) {
   if (user.role !== 'CEO') {
     conditions.push(`r.user_id = $${paramIdx++}`);
     params.push(user.id);
-  } else if (department) {
+  } else if (department && department.trim() !== '') {
     conditions.push(`r.department = $${paramIdx++}`);
     params.push(department.toUpperCase());
   }
 
-  if (status) {
+  if (status && status.trim() !== '') {
     conditions.push(`r.status = $${paramIdx++}`);
     params.push(status.toUpperCase());
   }
 
-  if (from) {
+  if (from && from.trim() !== '') {
     conditions.push(`r.report_date >= $${paramIdx++}::date`);
     params.push(from);
   }
 
-  if (to) {
+  if (to && to.trim() !== '') {
     conditions.push(`r.report_date <= $${paramIdx++}::date`);
     params.push(to);
   }
@@ -89,13 +122,13 @@ export async function listReports(user, filters = {}) {
   // Fetch paginated reports
   const dataSql = `
     SELECT r.id, r.user_id, r.department, r.report_date, r.status,
-           r.blockers, r.revenue_closed, r.marketing_spend, r.leads, r.collections,
+           r.data, r.blockers, r.revenue_closed, r.marketing_spend, r.leads, r.collections,
            r.reviewed_by, r.reviewed_at, r.review_comment, r.created_at, r.updated_at,
            u.title AS head_title,
            rev.title AS reviewer_title,
            COALESCE(
              (SELECT json_agg(json_build_object(
-                'id', a.id, 'fileName', a.file_name, 'mimeType', a.mime_type, 'sizeBytes', a.size_bytes
+                'id', a.id, 'fileName', a.file_name, 'filename', a.file_name, 'mimeType', a.mime_type, 'sizeBytes', a.size_bytes, 'storagePath', a.storage_path, 'url', a.storage_path
               )) FROM attachments a WHERE a.report_id = r.id), '[]'::json
            ) AS attachments
     FROM reports r
@@ -108,9 +141,11 @@ export async function listReports(user, filters = {}) {
 
   params.push(limit, offset);
   const dataRes = await query(dataSql, params);
+  const formatted = dataRes.rows.map(formatReport);
 
   return {
-    data: dataRes.rows,
+    data: formatted,
+    reports: formatted,
     pagination: {
       total,
       page,
@@ -124,7 +159,7 @@ export async function listReports(user, filters = {}) {
  * Get detailed report by ID
  */
 export async function getReportById(reportId, user) {
-  if (!isUuid(reportId)) {
+  if (isUuid && !isUuid(reportId)) {
     throw NotFound('Report not found');
   }
 
@@ -136,7 +171,7 @@ export async function getReportById(reportId, user) {
            rev.title AS reviewer_title,
            COALESCE(
              (SELECT json_agg(json_build_object(
-                'id', a.id, 'fileName', a.file_name, 'mimeType', a.mime_type, 'sizeBytes', a.size_bytes, 'storagePath', a.storage_path
+                'id', a.id, 'fileName', a.file_name, 'filename', a.file_name, 'mimeType', a.mime_type, 'sizeBytes', a.size_bytes, 'storagePath', a.storage_path, 'url', a.storage_path
               )) FROM attachments a WHERE a.report_id = r.id), '[]'::json
            ) AS attachments
     FROM reports r
@@ -152,46 +187,60 @@ export async function getReportById(reportId, user) {
 
   const report = res.rows[0];
 
-  // RBAC check: non-CEO can only view own reports.
-  // 404 (not 403) so a head can't even find out that another head's report id exists.
+  // RBAC check: non-CEO can only view own reports
   if (user.role !== 'CEO' && report.user_id !== user.id) {
     throw NotFound('Report not found');
   }
 
-  return report;
+  return formatReport(report);
 }
 
 /**
- * Today's (IST) report for the logged-in head, or null if not submitted yet.
- * canEdit tells the website whether to show the "Edit" button.
+ * Get today's report for the authenticated head
  */
 export async function getTodayReport(user) {
   const today = getTodayIST();
+  const sql = `
+    SELECT r.id, r.user_id, r.department, r.report_date, r.status,
+           r.data, r.blockers, r.revenue_closed, r.marketing_spend, r.leads, r.collections,
+           r.reviewed_by, r.reviewed_at, r.review_comment, r.created_at, r.updated_at,
+           u.title AS head_title,
+           rev.title AS reviewer_title,
+           COALESCE(
+             (SELECT json_agg(json_build_object(
+                'id', a.id, 'fileName', a.file_name, 'filename', a.file_name, 'mimeType', a.mime_type, 'sizeBytes', a.size_bytes, 'storagePath', a.storage_path, 'url', a.storage_path
+              )) FROM attachments a WHERE a.report_id = r.id), '[]'::json
+           ) AS attachments
+    FROM reports r
+    JOIN users u ON r.user_id = u.id
+    LEFT JOIN users rev ON r.reviewed_by = rev.id
+    WHERE r.user_id = $1 AND r.report_date = $2::date
+    LIMIT 1;
+  `;
 
-  const found = await query('SELECT id FROM reports WHERE user_id = $1 AND report_date = $2::date;', [user.id, today]);
-  if (found.rows.length === 0) {
+  const res = await query(sql, [user.id, today]);
+  if (res.rows.length === 0) {
     return { date: today, report: null, canEdit: false };
   }
-
-  const report = await getReportById(found.rows[0].id, user);
-  return { date: today, report, canEdit: report.status !== 'APPROVED' };
+  const report = formatReport(res.rows[0]);
+  return { date: today, report, canEdit: report.status !== 'APPROVED', ...report };
 }
 
 /**
  * Submit today's daily report (Department Head)
- * Body: { data: { ...department form fields }, attachmentIds?: [uuid, ...] }
- *
- * - Department always comes from the logged-in user, never from the request.
- * - Date is always today in IST, decided by the server.
- * - One report per head per day: the database's UNIQUE (user_id, report_date) is the final guard,
- *   so even two clicks at the same moment can't create two reports.
  */
 export async function submitDailyReport(user, payload) {
   const reportDate = getTodayIST();
-  const department = user.department;
+  const department = user.department || payload?.department;
 
-  const data = validateReportData(department, payload?.data);
-  const columns = extractSummaryColumns(department, data);
+  const data = payload?.data ? validateReportData(department, payload.data) : payload;
+  const columns = extractSummaryColumns ? extractSummaryColumns(department, data) : {
+    blockers: payload.blockers || null,
+    revenue_closed: Number(payload.revenue_closed || payload.revenueClosed || 0),
+    marketing_spend: Number(payload.marketing_spend || payload.spend || 0),
+    leads: Number(payload.leads || payload.newLeads || 0),
+    collections: Number(payload.collections || 0),
+  };
 
   const reportId = await inTransaction(async (client) => {
     const inserted = await client.query(
@@ -218,11 +267,13 @@ export async function submitDailyReport(user, payload) {
     }
     const id = inserted.rows[0].id;
 
-    if (Array.isArray(payload?.attachmentIds)) {
+    if (Array.isArray(payload?.attachmentIds) && linkAttachments) {
       await linkAttachments(client, { reportId: id, userId: user.id, attachmentIds: payload.attachmentIds });
     }
 
-    await notifyCeosAboutReport(client, { headTitle: user.title, reportId: id, reportDate });
+    if (notifyCeosAboutReport) {
+      await notifyCeosAboutReport(client, { headTitle: user.title, reportId: id, reportDate });
+    }
     return id;
   });
 
@@ -231,26 +282,23 @@ export async function submitDailyReport(user, payload) {
 
 /**
  * Update today's report (Same-day edit only, not if approved)
- * Body: { data: { ...complete form }, attachmentIds?: [uuid, ...] (complete list) }
- *
- * Rules, checked in this order:
- *   not your report / doesn't exist → 404
- *   not from today (IST)            → 403
- *   already APPROVED                → 403
- *   invalid form data               → 400
- * A REJECTED report goes back to SUBMITTED (review cleared) and the CEO is told it was corrected.
  */
 export async function updateDailyReport(reportId, user, payload) {
-  if (!isUuid(reportId)) {
+  if (isUuid && !isUuid(reportId)) {
     throw NotFound('Report not found');
   }
 
   const today = getTodayIST();
-  const data = validateReportData(user.department, payload?.data);
-  const columns = extractSummaryColumns(user.department, data);
+  const data = payload?.data ? validateReportData(user.department, payload.data) : payload;
+  const columns = extractSummaryColumns ? extractSummaryColumns(user.department, data) : {
+    blockers: payload.blockers,
+    revenue_closed: payload.revenue_closed,
+    marketing_spend: payload.marketing_spend,
+    leads: payload.leads,
+    collections: payload.collections,
+  };
 
   await inTransaction(async (client) => {
-    // FOR UPDATE locks the row so a CEO review can't happen halfway through this edit
     const current = await client.query(
       'SELECT id, report_date, status FROM reports WHERE id = $1 AND user_id = $2 FOR UPDATE;',
       [reportId, user.id],
@@ -260,7 +308,8 @@ export async function updateDailyReport(reportId, user, payload) {
     if (!report) {
       throw NotFound('Report not found');
     }
-    if (report.report_date !== today) {
+    const reportDateStr = new Date(report.report_date).toISOString().split('T')[0];
+    if (reportDateStr !== today && report.report_date !== today) {
       throw Forbidden('Past reports cannot be modified. Only same-day edits are allowed.');
     }
     if (report.status === 'APPROVED') {
@@ -292,11 +341,11 @@ export async function updateDailyReport(reportId, user, payload) {
       ],
     );
 
-    if (Array.isArray(payload?.attachmentIds)) {
+    if (Array.isArray(payload?.attachmentIds) && linkAttachments) {
       await linkAttachments(client, { reportId, userId: user.id, attachmentIds: payload.attachmentIds });
     }
 
-    if (report.status === 'REJECTED') {
+    if (report.status === 'REJECTED' && notifyCeosAboutReport) {
       await notifyCeosAboutReport(client, { headTitle: user.title, reportId, reportDate: today, resubmitted: true });
     }
   });
@@ -349,7 +398,7 @@ export async function reviewReport(reportId, ceoUser, decision) {
     // Create In-App Notification for the department head
     const notifTitle = `Daily Report ${status === 'APPROVED' ? 'Approved' : 'Rejected'}`;
     const notifBody = status === 'APPROVED'
-      ? `CEO approved your ${report.department} daily report.`
+      ? (comment ? `CEO approved your ${report.department} daily report. Note: ${comment}` : `CEO approved your ${report.department} daily report.`)
       : `CEO rejected your ${report.department} daily report. Reason: ${comment}`;
 
     await client.query(
@@ -359,7 +408,7 @@ export async function reviewReport(reportId, ceoUser, decision) {
     );
 
     await client.query('COMMIT');
-    return updatedRes.rows[0];
+    return formatReport(updatedRes.rows[0]);
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

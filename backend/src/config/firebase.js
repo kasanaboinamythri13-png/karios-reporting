@@ -1,9 +1,6 @@
-// Firebase Admin SDK setup (verifies login tokens, private file storage).
-// Owner: Member 1
-//
-// firebase-admin v12+ uses modular imports ('firebase-admin/app', '/auth', '/storage');
-// the old `admin.credential.cert(...)` style no longer exists.
-
+// ============================================================
+// Karios Backend — Firebase Admin SDK Setup
+// ============================================================
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getStorage } from 'firebase-admin/storage';

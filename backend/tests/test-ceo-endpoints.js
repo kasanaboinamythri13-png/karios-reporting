@@ -33,9 +33,14 @@ const server = app.listen(PORT, async () => {
     })).json();
     console.log(`✅ 4. GET /api/reports: Retrieved ${reportsList.data.length} reports.`);
 
-    // 5. CEO Review (Approve report)
+    // 5. CEO Get Report Details by ID & Review
     if (reportsList.data.length > 0) {
       const targetReport = reportsList.data[0];
+      const singleReport = await (await fetch(`${baseUrl}/reports/${targetReport.id}`, {
+        headers: { 'Authorization': 'Bearer dev-ceo' },
+      })).json();
+      console.log(`✅ 5. GET /api/reports/${targetReport.id}: Details fetched for ${singleReport.department}`);
+
       const reviewRes = await (await fetch(`${baseUrl}/reports/${targetReport.id}/review`, {
         method: 'POST',
         headers: {
@@ -47,14 +52,12 @@ const server = app.listen(PORT, async () => {
           comment: 'Approved by CEO. Solid execution today.',
         }),
       })).json();
-      console.log('✅ 5. POST /api/reports/:id/review (Approval):', reviewRes);
+      console.log(`✅ 6. POST /api/reports/${targetReport.id}/review (Approved):`, reviewRes.message);
     }
 
-    console.log('\n======================================================');
-    console.log('🚀 ALL CEO BACKEND ENDPOINTS ARE FULLY OPERATIONAL!');
-    console.log('======================================================\n');
+    console.log('\n🎉 ALL CEO BACKEND ENDPOINT INTEGRATION TESTS PASSED SUCCESSFULLY!');
   } catch (err) {
-    console.error('❌ Test failed with error:', err);
+    console.error('❌ Test failed:', err);
   } finally {
     server.close();
     await pool.end();

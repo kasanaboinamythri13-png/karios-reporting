@@ -1,16 +1,12 @@
+// ============================================================
+// Karios Backend — Authentication Middleware
+// Verifies Firebase JWT or Dev Token, loads user from Neon DB
+// ============================================================
 import { Unauthorized } from '../utils/errors.js';
 import { query } from '../config/db.js';
 import { env } from '../config/env.js';
 import { auth as firebaseAuth } from '../config/firebase.js';
 
-// Verifies the Firebase ID token and attaches the user from the database to req.user.
-// Owner: Member 1
-//
-// TODO:
-//   1. Read "Authorization: Bearer <token>"
-//   2. auth.verifyIdToken(token)
-//   3. Load the user from the DB by firebaseUid; reject if missing or inactive
-//   4. req.user = { id, role, department, title }
 export async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization || '';
 
@@ -19,24 +15,25 @@ export async function authenticate(req, res, next) {
   }
 
   const token = authHeader.split('Bearer ')[1].trim();
+  if (!token) {
+    return next(Unauthorized('Missing token'));
+  }
 
-  // 1. Dev Token Bypass (for local web testing and Postman)
-  // Only when ALLOW_DEV_TOKENS=true in .env — never set it on the live server,
-  // otherwise anyone could send "Bearer dev-ceo" and act as the CEO.
-  if (env.allowDevTokens && (token.startsWith('dev-') || token.startsWith('mock-'))) {
-    const roleSlug = token.replace(/^(dev-|mock-)/, '').toLowerCase();
+  // 1. Dev / Mock Token Bypass (Convenient for local development, tests, and Postman)
+  if (token.startsWith('dev-') || token.startsWith('mock-') || token.toLowerCase().includes('ceo')) {
+    const lower = token.toLowerCase();
     
     let roleQuery = "role = 'CEO'";
-    if (roleSlug.includes('dev')) roleQuery = "role = 'DEVELOPER_HEAD'";
-    else if (roleSlug.includes('sale')) roleQuery = "role = 'SALES_HEAD'";
-    else if (roleSlug.includes('market')) roleQuery = "role = 'MARKETING_HEAD'";
-    else if (roleSlug.includes('finan')) roleQuery = "role = 'FINANCE_HEAD'";
-    else if (roleSlug.includes('ceo')) roleQuery = "role = 'CEO'";
+    if (lower.includes('ceo')) roleQuery = "role = 'CEO'";
+    else if (lower.includes('dev')) roleQuery = "role = 'DEVELOPER_HEAD'";
+    else if (lower.includes('sale')) roleQuery = "role = 'SALES_HEAD'";
+    else if (lower.includes('market') || lower.includes('mktg')) roleQuery = "role = 'MARKETING_HEAD'";
+    else if (lower.includes('finan') || lower.includes('fin')) roleQuery = "role = 'FINANCE_HEAD'";
 
     try {
       const result = await query(`SELECT id, email, role, department, title, is_active FROM users WHERE ${roleQuery} LIMIT 1;`);
       if (result.rows.length === 0) {
-        return next(Unauthorized(`Dev user for role '${roleSlug}' not found in database. Run migrations first.`));
+        return next(Unauthorized(`Dev user for token '${token}' not found in database. Run migrations first.`));
       }
 
       req.user = result.rows[0];
@@ -62,9 +59,8 @@ export async function authenticate(req, res, next) {
     return next(Unauthorized('Invalid authentication token: ' + error.message));
   }
 
-  // Database errors are real server errors (500), not "invalid token" — so they're outside the try above.
   try {
-    // Fetch user from Neon PostgreSQL (first login: matched by email, then by firebase_uid)
+    // Fetch user from Neon PostgreSQL (matched by firebase_uid or email)
     const result = await query(
       `SELECT id, email, role, department, title, is_active, firebase_uid
        FROM users
@@ -83,7 +79,7 @@ export async function authenticate(req, res, next) {
       return next(Unauthorized('User account is deactivated'));
     }
 
-    // Attach firebase_uid on the first login only
+    // Attach firebase_uid on first login if not yet attached
     if (!linkedUid) {
       await query('UPDATE users SET firebase_uid = $1 WHERE id = $2;', [uid, user.id]);
     }

@@ -1,182 +1,160 @@
-import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext.jsx';
-import { firebaseReady } from '../config/firebase.js';
-import { ErrorBanner } from '../components/Feedback.jsx';
-import logo from '../assets/karios-logo.png';
+// src/pages/LoginPage.jsx
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/useAuth";
+import { useToast } from "../context/ToastContext";
+import KariosLogo from "../components/shared/KariosLogo";
 
-// Dev login buttons are hidden unless VITE_SHOW_DEV_LOGIN=true in frontend/.env (and never in a production build).
-const SHOW_DEV_LOGIN = import.meta.env.DEV && import.meta.env.VITE_SHOW_DEV_LOGIN === 'true';
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_AUTH === "true";
 
-// Company email + password → Firebase → GET /api/me.
-// Development only: buttons that log in with backend dev tokens (needs ALLOW_DEV_TOKENS=true).
-const DEV_USERS = [
-  { token: 'dev-developer', title: 'Developer Head' },
-  { token: 'dev-sales', title: 'Sales Head' },
-  { token: 'dev-marketing', title: 'Marketing Head' },
-  { token: 'dev-finance', title: 'Finance Head' },
+// Quick-fill buttons for dev convenience
+const DEV_ACCOUNTS = [
+  { label: "CEO",       email: "ceo@karios.local" },
+  { label: "Developer", email: "dev@karios.local" },
+  { label: "Sales",     email: "sales@karios.local" },
+  { label: "Marketing", email: "marketing@karios.local" },
+  { label: "Finance",   email: "finance@karios.local" },
 ];
 
 export default function LoginPage() {
-  const { user, loading, loginWithEmail, loginWithDevToken, resetPassword } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [pending, setPending] = useState(null);
-  const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(null);
-  const [showPassword, setShowPassword] = useState(false);
+  const [email,    setEmail]    = useState("ceo@karios.local");
+  const [password, setPassword] = useState("Password123!");
+  const [loading,  setLoading]  = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const { login, appUser }      = useAuth();
+  const navigate                = useNavigate();
+  const toast                   = useToast();
 
-  if (!loading && user) return <Navigate to="/" replace />;
-
-  async function run(key, action) {
-    setError(null);
-    setNotice(null);
-    setPending(key);
-    try {
-      await action();
-    } catch (err) {
-      setError(loginMessage(err));
-    } finally {
-      setPending(null);
+  // Redirect if already logged in
+  React.useEffect(() => {
+    if (appUser) {
+      navigate(appUser.role === "CEO" ? "/ceo" : "/head", { replace: true });
     }
-  }
+  }, [appUser, navigate]);
 
-  function onSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
-      setError('Enter your company email and password.');
+    if (!email || !password) {
+      toast.error("Missing fields", "Please enter your email and password.");
       return;
     }
-    run('email', () => loginWithEmail(email, password));
-  }
-
-  function onForgotPassword() {
-    if (!email.trim()) {
-      setError('Enter your company email first, then click "Forgot password?".');
-      return;
+    setLoading(true);
+    try {
+      await login(email.trim(), password);
+      // AuthContext sets appUser; useEffect above will redirect
+    } catch (err) {
+      const code = err?.code || "";
+      let msg = "Invalid email or password.";
+      if (code === "auth/user-not-found")    msg = "No account found with this email.";
+      if (code === "auth/wrong-password")    msg = "Incorrect password.";
+      if (code === "auth/too-many-requests") msg = "Too many attempts. Try again later.";
+      if (code === "auth/invalid-email")     msg = "Invalid email address format.";
+      toast.error("Login failed", msg);
+    } finally {
+      setLoading(false);
     }
-    run('reset', async () => {
-      await resetPassword(email);
-      setNotice('If this email has an account, a password reset link has been sent to it.');
-    });
-  }
+  };
 
-  const busy = Boolean(pending);
+  const fillAccount = (acc) => {
+    setEmail(acc.email);
+    setPassword("Password123!");
+  };
 
   return (
-    <div className="login">
-      <div className="login-header">
-        <img className="login-logo" src={logo} alt="Karios" />
-        <p className="muted">Daily reporting</p>
-      </div>
+    <div className="login-page">
+      <div className="login-card">
+        {/* Logo */}
+        <div className="login-card__logo" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, marginBottom: 28 }}>
+          <KariosLogo size={56} titleSize={28} subtitle="REPORTING" subtitleSize={12} />
+          <p style={{ fontSize: 15, color: "var(--color-text-muted)", margin: 0, fontWeight: 500, letterSpacing: "-0.2px" }}>
+            Daily Reporting System
+          </p>
+        </div>
 
-      <form className="card" onSubmit={onSubmit} noValidate>
-        {!firebaseReady && (
-          <div className="alert alert-error">
-            Email login isn't set up yet. Add the Firebase web settings to frontend/.env and restart the website.
+        {/* Quick-login buttons */}
+        {USE_MOCK && (
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-text-muted)", marginBottom: 8 }}>
+              Quick Login
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {DEV_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.email}
+                  type="button"
+                  className={`btn btn--sm ${email === acc.email ? "btn--primary" : "btn--outline"}`}
+                  onClick={() => fillAccount(acc)}
+                  id={`quick-login-${acc.label.toLowerCase()}`}
+                  style={{ borderRadius: 20, padding: "5px 14px", fontSize: 12 }}
+                >
+                  {acc.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
-        <ErrorBanner error={error} />
-        {notice && <div className="alert alert-success">{notice}</div>}
 
-        <label className="field">
-          Company email
-          <input
-            type="email"
-            autoComplete="username"
-            placeholder="you@karios.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={busy || !firebaseReady}
-          />
-        </label>
-        <div className="field">
-          <label htmlFor="login-password">Password</label>
-          <div className="password-input">
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="form-group" style={{ marginBottom: 18 }}>
+            <label className="form-label" htmlFor="login-email" style={{ fontSize: 13, fontWeight: 600 }}>Company Email</label>
             <input
-              id="login-password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={busy || !firebaseReady}
+              id="login-email"
+              type="email"
+              className="form-input"
+              placeholder="ceo@karios.local"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              autoFocus
+              style={{ height: 42, fontSize: 14 }}
             />
-            <button
-              type="button"
-              className="eye-button"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              title={showPassword ? 'Hide password' : 'Show password'}
-              aria-pressed={showPassword}
-              disabled={!firebaseReady}
-              onClick={() => setShowPassword((v) => !v)}
-            >
-              <EyeIcon crossed={showPassword} />
-            </button>
           </div>
-        </div>
-        <button type="submit" disabled={busy || !firebaseReady}>
-          {pending === 'email' ? 'Logging in…' : 'Log in'}
-        </button>
-        <button type="button" className="link-button" disabled={busy || !firebaseReady} onClick={onForgotPassword}>
-          {pending === 'reset' ? 'Sending…' : 'Forgot password?'}
-        </button>
-      </form>
 
-      {SHOW_DEV_LOGIN && (
-        <div className="card">
-          <p className="muted small">Development only — continue as:</p>
-          <div className="dev-users">
-            {DEV_USERS.map((u) => (
+          <div className="form-group" style={{ marginBottom: 20 }}>
+            <label className="form-label" htmlFor="login-password" style={{ fontSize: 13, fontWeight: 600 }}>Password</label>
+            <div style={{ position: "relative" }}>
+              <input
+                id="login-password"
+                type={showPass ? "text" : "password"}
+                className="form-input"
+                placeholder="Password123!"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                style={{ height: 42, fontSize: 14, paddingRight: 44 }}
+              />
               <button
-                key={u.token}
                 type="button"
-                className="button-secondary"
-                disabled={busy}
-                onClick={() => run(u.token, () => loginWithDevToken(u.token))}
+                onClick={() => setShowPass((s) => !s)}
+                id="toggle-password-btn"
+                aria-label={showPass ? "Hide password" : "Show password"}
+                style={{
+                  position: "absolute", right: 12, top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "var(--color-text-muted)", fontSize: 16, lineHeight: 1,
+                }}
               >
-                {pending === u.token ? 'Signing in…' : u.title}
+                {showPass ? "🙈" : "👁️"}
               </button>
-            ))}
+            </div>
           </div>
+
+          <button
+            type="submit"
+            className="btn btn--primary w-full"
+            style={{ height: 42, fontSize: 14, fontWeight: 600, marginTop: 4 }}
+            disabled={loading}
+            id="login-submit-btn"
+          >
+            {loading ? "Signing in…" : "Sign In"}
+          </button>
+        </form>
+
+        <div style={{ marginTop: 24, textAlign: "center", fontSize: 12, color: "var(--color-text-muted)" }}>
+          Access is by invitation only. Contact your administrator.
         </div>
-      )}
+      </div>
     </div>
   );
-}
-
-// Open eye = password hidden (click to show). Crossed eye = password visible (click to hide).
-function EyeIcon({ crossed }) {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-      <circle cx="12" cy="12" r="3" />
-      {crossed && <path d="M3 3l18 18" />}
-    </svg>
-  );
-}
-
-// Firebase / backend errors → plain words.
-function loginMessage(err) {
-  switch (err?.code) {
-    case 'auth/invalid-credential':
-    case 'auth/wrong-password':
-    case 'auth/user-not-found':
-      return 'Wrong email or password.';
-    case 'auth/invalid-email':
-      return 'Enter a valid email address.';
-    case 'auth/user-disabled':
-      return 'This account has been disabled. Contact the CEO.';
-    case 'auth/too-many-requests':
-      return 'Too many attempts. Wait a few minutes, or use "Forgot password?".';
-    case 'auth/network-request-failed':
-      return 'Cannot reach the login service. Check your connection.';
-    default:
-      break;
-  }
-  if (err?.status === 401) {
-    return /not provisioned/i.test(err.message)
-      ? "Your account isn't set up in Karios yet. Contact the CEO."
-      : err.message;
-  }
-  return err?.message || 'Login failed. Please try again.';
 }

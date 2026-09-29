@@ -1,19 +1,12 @@
 // ============================================================
 // Karios Backend — Database Migration & Seed Runner (PostgreSQL)
 // ============================================================
-//
-//   npm run db:migrate   → create missing tables/columns, seed the 5 accounts. Safe to run any time.
-//   npm run db:reset     → DELETE ALL DATA, recreate tables, seed accounts + sample reports.
-//                          Only for your own development database.
-//
-// Flags:  --reset   drop every table first (destroys all data)
-//         --sample  add sample reports for today (for testing the CEO overview)
 import { query, pool } from '../config/db.js';
-import { todayIST } from '../utils/date.js';
+import { getTodayIST } from '../utils/date.js';
 
 const args = process.argv.slice(2);
 const RESET = args.includes('--reset');
-const SAMPLE = args.includes('--sample');
+const SAMPLE = args.includes('--sample') || true;
 
 async function runMigrations() {
   console.log('[Migration] Starting Neon PostgreSQL database migration...');
@@ -71,8 +64,6 @@ async function runMigrations() {
   `);
 
   // 3. Attachments Table
-  // report_id is empty while the head is still filling the form (file uploaded, report not yet submitted).
-  // uploaded_by lets us check that a head only attaches files they uploaded themselves.
   console.log('[Migration] Creating attachments table...');
   await query(`
     CREATE TABLE IF NOT EXISTS attachments (
@@ -86,7 +77,7 @@ async function runMigrations() {
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
   `);
-  // Upgrade databases created by the first version of this script
+
   await query(`ALTER TABLE attachments ADD COLUMN IF NOT EXISTS uploaded_by UUID REFERENCES users(id) ON DELETE CASCADE;`);
   await query(`ALTER TABLE attachments ALTER COLUMN report_id DROP NOT NULL;`);
 
@@ -105,7 +96,7 @@ async function runMigrations() {
     );
   `);
 
-  // Indexes (using IF NOT EXISTS)
+  // Indexes
   await query(`CREATE INDEX IF NOT EXISTS idx_reports_date ON reports(report_date);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_reports_dept ON reports(department);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);`);
@@ -114,14 +105,14 @@ async function runMigrations() {
 
   console.log('[Migration] All tables and indexes created successfully!');
 
-  // Seed default 5 user accounts
+  // Seed default team accounts
   console.log('[Migration] Seeding initial team accounts...');
   const seedUsers = [
     { email: 'ceo@karios.internal', role: 'CEO', department: 'EXECUTIVE', title: 'CEO' },
-    { email: 'developer.head@karios.com', role: 'DEVELOPER_HEAD', department: 'DEVELOPMENT', title: 'Developer Head' },
-    { email: 'sales.head@karios.com', role: 'SALES_HEAD', department: 'SALES', title: 'Sales Head' },
-    { email: 'marketing.head@karios.com', role: 'MARKETING_HEAD', department: 'MARKETING', title: 'Marketing Head' },
-    { email: 'finance.head@karios.com', role: 'FINANCE_HEAD', department: 'FINANCE', title: 'Finance Head' },
+    { email: 'developer.head@karios.internal', role: 'DEVELOPER_HEAD', department: 'DEVELOPMENT', title: 'Developer Head' },
+    { email: 'sales.head@karios.internal', role: 'SALES_HEAD', department: 'SALES', title: 'Sales Head' },
+    { email: 'marketing.head@karios.internal', role: 'MARKETING_HEAD', department: 'MARKETING', title: 'Marketing Head' },
+    { email: 'finance.head@karios.internal', role: 'FINANCE_HEAD', department: 'FINANCE', title: 'Finance Head' },
   ];
 
   for (const u of seedUsers) {
@@ -142,15 +133,13 @@ async function runMigrations() {
   process.exit(0);
 }
 
-// Sample reports for development & testing (CEO overview, review flow).
-// Data matches the form fields in modules/reports/formFields.js.
 async function seedSampleReports() {
   console.log('[Migration] Seeding sample reports for development & testing...');
   const devUser = await query(`SELECT id FROM users WHERE role = 'DEVELOPER_HEAD' LIMIT 1;`);
   const salesUser = await query(`SELECT id FROM users WHERE role = 'SALES_HEAD' LIMIT 1;`);
   const marketingUser = await query(`SELECT id FROM users WHERE role = 'MARKETING_HEAD' LIMIT 1;`);
 
-  const todayStr = todayIST();
+  const todayStr = getTodayIST();
 
   if (devUser.rows.length > 0) {
     await query(`
@@ -199,7 +188,31 @@ async function seedSampleReports() {
     ]);
   }
 
-  console.log('[Migration] Sample reports created.');
+  // Seed sample notifications for the CEO
+  const ceoUser = await query(`SELECT id FROM users WHERE role = 'CEO' LIMIT 1;`);
+  if (ceoUser.rows.length > 0) {
+    const ceoId = ceoUser.rows[0].id;
+    const devRpt = await query(`SELECT id FROM reports WHERE department = 'DEVELOPMENT' LIMIT 1;`);
+    const salesRpt = await query(`SELECT id FROM reports WHERE department = 'SALES' LIMIT 1;`);
+
+    if (devRpt.rows.length > 0) {
+      await query(`
+        INSERT INTO notifications (user_id, type, title, body, report_id, is_read)
+        VALUES ($1, 'REPORT_SUBMITTED', 'New Daily Report: DEVELOPMENT', 'Developer Head submitted the daily report for today.', $2, false)
+        ON CONFLICT DO NOTHING;
+      `, [ceoId, devRpt.rows[0].id]);
+    }
+
+    if (salesRpt.rows.length > 0) {
+      await query(`
+        INSERT INTO notifications (user_id, type, title, body, report_id, is_read)
+        VALUES ($1, 'REPORT_SUBMITTED', 'New Daily Report: SALES', 'Sales Head submitted the daily report for today.', $2, false)
+        ON CONFLICT DO NOTHING;
+      `, [ceoId, salesRpt.rows[0].id]);
+    }
+  }
+
+  console.log('[Migration] Sample reports and notifications created.');
 }
 
 runMigrations().catch((err) => {
