@@ -3,21 +3,21 @@
 // Aggregates department report statuses, blockers, and KPI metrics
 // ============================================================
 import { query } from '../../config/db.js';
-import { getTodayIST } from '../../utils/date.js';
+import { todayIST, getTodayIST } from '../../utils/date.js';
 
 const DEPARTMENTS = [
   { department: 'DEVELOPMENT', title: 'Developer Head', role: 'DEVELOPER_HEAD' },
-  { department: 'SALES', title: 'Sales Head', role: 'SALES_HEAD' },
-  { department: 'MARKETING', title: 'Marketing Head', role: 'MARKETING_HEAD' },
-  { department: 'FINANCE', title: 'Finance Head', role: 'FINANCE_HEAD' },
+  { department: 'SALES',       title: 'Sales Head',     role: 'SALES_HEAD' },
+  { department: 'MARKETING',   title: 'Marketing Head', role: 'MARKETING_HEAD' },
+  { department: 'FINANCE',     title: 'Finance Head',   role: 'FINANCE_HEAD' },
 ];
 
 export async function getExecutiveOverview(targetDate) {
-  const dateStr = targetDate || getTodayIST();
+  const dateStr = targetDate || todayIST();
 
   // 1. Fetch all reports for the given date
   const reportsResult = await query(
-    `SELECT r.id, r.department, r.status, r.blockers, r.revenue_closed, 
+    `SELECT r.id, r.department, r.status, r.blockers, r.data, r.revenue_closed, 
             r.marketing_spend, r.leads, r.collections, r.created_at,
             u.title AS head_title
      FROM reports r
@@ -28,10 +28,10 @@ export async function getExecutiveOverview(targetDate) {
 
   const reportsByDept = new Map();
   for (const row of reportsResult.rows) {
-    reportsByDept.set(row.department, row);
+    reportsByDept.set(row.department.toUpperCase(), row);
   }
 
-  // 2. Build department status array
+  // 2. Build department status array and aggregate metrics
   let submittedCount = 0;
   let approvedCount = 0;
   let rejectedCount = 0;
@@ -50,19 +50,25 @@ export async function getExecutiveOverview(targetDate) {
       if (report.status === 'APPROVED') approvedCount++;
       if (report.status === 'REJECTED') rejectedCount++;
 
-      if (report.blockers && report.blockers.trim().length > 0) {
+      const blockerText = (report.blockers || report.data?.blockers || '').trim();
+      if (blockerText.length > 0) {
         blockersList.push({
           department: dept.department,
           title: dept.title,
-          blocker: report.blockers.trim(),
+          blocker: blockerText,
           reportId: report.id,
         });
       }
 
-      totalRevenueClosed += Number(report.revenue_closed || 0);
-      totalMarketingSpend += Number(report.marketing_spend || 0);
-      totalLeads += Number(report.leads || 0);
-      totalCollections += Number(report.collections || 0);
+      const rev = Number(report.revenue_closed || report.data?.revenue_closed || report.data?.revenueClosed || 0);
+      const mkt = Number(report.marketing_spend || report.data?.marketing_spend || report.data?.spend || 0);
+      const lead = Number(report.leads || report.data?.leads || report.data?.newLeads || 0);
+      const coll = Number(report.collections || report.data?.collections || 0);
+
+      totalRevenueClosed += rev;
+      totalMarketingSpend += mkt;
+      totalLeads += lead;
+      totalCollections += coll;
 
       return {
         department: dept.department,

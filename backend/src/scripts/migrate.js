@@ -162,7 +162,29 @@ async function runMigrations() {
     ]);
   }
 
-  console.log('[Migration] All sample reports and accounts created in Neon database!');
+  // Seed sample notifications for the CEO
+  const ceoUser = await query(`SELECT id FROM users WHERE role = 'CEO' LIMIT 1;`);
+  if (ceoUser.rows.length > 0) {
+    const ceoId = ceoUser.rows[0].id;
+    const devRpt = await query(`SELECT id FROM reports WHERE department = 'DEVELOPMENT' LIMIT 1;`);
+    const salesRpt = await query(`SELECT id FROM reports WHERE department = 'SALES' LIMIT 1;`);
+
+    if (devRpt.rows.length > 0) {
+      await query(`
+        INSERT INTO notifications (user_id, type, title, body, report_id, is_read)
+        VALUES ($1, 'REPORT_SUBMITTED', 'New Daily Report: DEVELOPMENT', 'Developer Head submitted the daily report for today.', $2, false);
+      `, [ceoId, devRpt.rows[0].id]);
+    }
+
+    if (salesRpt.rows.length > 0) {
+      await query(`
+        INSERT INTO notifications (user_id, type, title, body, report_id, is_read)
+        VALUES ($1, 'REPORT_SUBMITTED', 'New Daily Report: SALES', 'Sales Head submitted the daily report for today.', $2, false);
+      `, [ceoId, salesRpt.rows[0].id]);
+    }
+  }
+
+  console.log('[Migration] All sample reports, accounts, and CEO notifications created in Neon database!');
   await pool.end();
   process.exit(0);
 }
