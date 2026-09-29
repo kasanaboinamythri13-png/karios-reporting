@@ -1,55 +1,63 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
-import { useAuth } from './auth/AuthContext.jsx';
-import RoleRoute from './auth/RoleRoute.jsx';
-import Layout from './components/Layout.jsx';
+// src/App.jsx — Root router with role-based guards
+import React from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import { useAuth }     from "./context/useAuth";
+import { ThemeProvider }  from "./context/ThemeContext";
+import { ToastProvider }  from "./context/ToastContext";
 
-import LoginPage from './pages/LoginPage.jsx';
-import NotFoundPage from './pages/NotFoundPage.jsx';
+// Layouts
+import CeoLayout from "./layouts/CeoLayout";
 
-import HeadHomePage from './pages/head/HeadHomePage.jsx';
-import ReportFormPage from './pages/head/ReportFormPage.jsx';
-import ReportHistoryPage from './pages/head/ReportHistoryPage.jsx';
+// Pages
+import LoginPage           from "./pages/LoginPage";
+import CeoOverviewPage     from "./pages/ceo/CeoOverviewPage";
+import CeoReportsPage      from "./pages/ceo/CeoReportsPage";
+import CeoReportDetailPage from "./pages/ceo/CeoReportDetailPage";
+import CeoProfilePage      from "./pages/ceo/CeoProfilePage";
 
-import OverviewPage from './pages/ceo/OverviewPage.jsx';
-import AllReportsPage from './pages/ceo/AllReportsPage.jsx';
+// Smart root redirect based on role
+function RootRedirect() {
+  const { appUser, loading } = useAuth();
+  if (loading) return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="loading-spinner" />
+    </div>
+  );
+  if (!appUser) return <Navigate to="/login" replace />;
+  return <Navigate to="/ceo" replace />;
+}
 
-import ReportDetailPage from './pages/shared/ReportDetailPage.jsx';
-import NotificationsPage from './pages/shared/NotificationsPage.jsx';
-import ProfilePage from './pages/shared/ProfilePage.jsx';
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/"      element={<RootRedirect />} />
+      <Route path="/login" element={<LoginPage />} />
 
-function HomeRedirect() {
-  const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
-  return <Navigate to={user.role === 'CEO' ? '/ceo' : '/head'} replace />;
+      {/* CEO Area */}
+      <Route path="/ceo" element={<CeoLayout />}>
+        <Route index              element={<CeoOverviewPage />} />
+        <Route path="reports"     element={<CeoReportsPage />} />
+        <Route path="reports/:id" element={<CeoReportDetailPage />} />
+        <Route path="profile"     element={<CeoProfilePage />} />
+      </Route>
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 }
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/" element={<HomeRedirect />} />
-
-      {/* Head area — Member 2 */}
-      <Route element={<RoleRoute roles={['HEAD']}><Layout /></RoleRoute>}>
-        <Route path="/head" element={<HeadHomePage />} />
-        <Route path="/head/report" element={<ReportFormPage />} />
-        <Route path="/head/history" element={<ReportHistoryPage />} />
-      </Route>
-
-      {/* CEO area — Member 3 */}
-      <Route element={<RoleRoute roles={['CEO']}><Layout /></RoleRoute>}>
-        <Route path="/ceo" element={<OverviewPage />} />
-        <Route path="/ceo/reports" element={<AllReportsPage />} />
-      </Route>
-
-      {/* Shared */}
-      <Route element={<RoleRoute roles={['HEAD', 'CEO']}><Layout /></RoleRoute>}>
-        <Route path="/reports/:id" element={<ReportDetailPage />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-      </Route>
-
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+    <BrowserRouter>
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <AppRoutes />
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   );
 }
