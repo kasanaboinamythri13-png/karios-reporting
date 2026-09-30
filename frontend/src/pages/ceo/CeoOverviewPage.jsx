@@ -191,18 +191,22 @@ export default function CeoOverviewPage() {
                   </div>
 
                   <div>
-                    {/* Status pill */}
+                    {/* Status badge */}
                     <div
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
                         gap: 6,
-                        padding: "3px 10px",
-                        borderRadius: 16,
+                        padding: "4px 9px",
+                        borderRadius: "var(--radius-sm)",
                         background: statusCfg.bg,
-                        fontSize: 12,
-                        fontWeight: 600,
+                        fontSize: 11,
+                        fontWeight: 700,
                         color: statusCfg.color,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        border: `1px solid ${statusCfg.color}33`,
+                        whiteSpace: "nowrap",
                       }}
                     >
                       <span

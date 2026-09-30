@@ -131,8 +131,8 @@ export default function CeoReportsPage() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 8,
-                padding: "7px 16px",
-                borderRadius: 24,
+                padding: "6px 12px",
+                borderRadius: "var(--radius-sm)",
                 fontSize: 13,
                 fontWeight: 600,
                 border: "1px solid",
@@ -147,8 +147,8 @@ export default function CeoReportsPage() {
               <span
                 style={{
                   fontSize: 11,
-                  padding: "1px 7px",
-                  borderRadius: 12,
+                  padding: "2px 6px",
+                  borderRadius: "var(--radius-sm)",
                   background: isActive ? "rgba(255, 255, 255, 0.25)" : "var(--color-bg)",
                   color: isActive ? "#ffffff" : "var(--color-text-muted)",
                   fontWeight: 700,
@@ -176,7 +176,7 @@ export default function CeoReportsPage() {
           marginBottom: 20,
         }}
       >
-        {/* Search input with search icon */}
+        {/* Search input with normal SVG search icon */}
         <div style={{ position: "relative", flex: "1 1 280px", maxWidth: 420 }}>
           <span
             style={{
@@ -184,12 +184,26 @@ export default function CeoReportsPage() {
               left: 12,
               top: "50%",
               transform: "translateY(-50%)",
-              fontSize: 14,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               color: "var(--color-text-muted)",
               pointerEvents: "none",
             }}
           >
-            🔍
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
           </span>
           <input
             type="text"
@@ -322,13 +336,14 @@ export default function CeoReportsPage() {
                         <span
                           style={{
                             display: "inline-block",
-                            padding: "3px 10px",
-                            borderRadius: 14,
+                            padding: "4px 9px",
+                            borderRadius: "var(--radius-sm)",
                             fontSize: 12,
                             fontWeight: 700,
                             background: deptStyle.bg,
                             color: deptStyle.color,
                             border: `1px solid ${deptStyle.border}`,
+                            whiteSpace: "nowrap",
                           }}
                         >
                           {r.department_title || r.department}
@@ -378,7 +393,7 @@ export default function CeoReportsPage() {
                           }}
                           style={{ color: "var(--color-primary)", fontWeight: 600 }}
                         >
-                          Open →
+                          Open
                         </button>
                       </td>
                     </tr>

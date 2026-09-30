@@ -26,7 +26,7 @@ export default function ProfilePage() {
           )}
         </dl>
         <button type="button" className="button-secondary" onClick={logout}>
-          Log out
+          Sign out
         </button>
       </div>
     </>
