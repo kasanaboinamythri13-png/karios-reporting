@@ -36,6 +36,33 @@
   background: var(--bg);
 }
 
+/* Dark mode — same palette as the main theme in ../index.css */
+[data-theme="dark"] {
+  --primary-soft: #2d2a55;
+
+  --bg: #0f0f1a;
+  --sidebar: #1a1a2e;
+  --card: #1a1a2e;
+  --border: #2a2a4a;
+  --border-strong: #3a3a5c;
+  --text: #f1f5f9;
+  --muted: #a3b1c6;
+
+  --approved: #34d399;
+  --approved-text: #6ee7b7;
+  --approved-bg: rgba(16, 185, 129, 0.14);
+  --pending: #fbbf24;
+  --pending-text: #fcd34d;
+  --pending-bg: rgba(245, 158, 11, 0.14);
+  --rejected: #f87171;
+  --rejected-text: #fca5a5;
+  --rejected-bg: rgba(239, 68, 68, 0.14);
+  --neutral: #94a3b8;
+  --neutral-bg: #25253d;
+}
+[data-theme="dark"] .table th { background: #20203a; }
+[data-theme="dark"] .notification.unread { background: #22203f; }
+
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); }
 h1, h2 { margin: 0; line-height: 1.3; }

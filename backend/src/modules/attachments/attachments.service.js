@@ -1,17 +1,15 @@
-// Report attachments (images + PDF) in a PRIVATE Firebase Storage bucket.
+// Report attachments (images + PDF), stored in the database (attachments.content).
 // Owner: Member 2
 //
 // How an upload works:
-//   1. Head asks for an upload link   → POST /api/attachments/upload-url
-//      We check type + size, save a row (not linked to a report yet) and return a signed link.
-//   2. Browser uploads the file straight to that link (the file never passes through our server).
-//   3. Head submits / edits the report with attachmentIds → linkAttachments() connects them.
-// Files are only ever handed out as short-lived signed links, never as public URLs.
+//   1. Head uploads the file → POST /api/attachments (raw file body, name in the X-File-Name header)
+//      We check type, size and the file's real content, then save it (not linked to a report yet).
+//   2. Head submits / edits the report with attachmentIds → linkAttachments() connects them.
+// Files are only ever sent to the head who uploaded them, or the CEO — never public.
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { query } from '../../config/db.js';
-import { bucket } from '../../config/firebase.js';
-import { AppError, BadRequest, NotFound } from '../../utils/errors.js';
+import { BadRequest, NotFound } from '../../utils/errors.js';
 import { isUuid } from '../../utils/validators.js';
 
 export const ALLOWED_TYPES = {
@@ -19,11 +17,18 @@ export const ALLOWED_TYPES = {
   'image/png': ['.png'],
   'application/pdf': ['.pdf'],
 };
-export const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB — files live in the database, so keep them small
 export const MAX_FILES_PER_REPORT = 5;
 
-const UPLOAD_LINK_MINUTES = 10;
-const DOWNLOAD_LINK_MINUTES = 5;
+// Uploads never attached to a report (form abandoned, file removed) are deleted after this long.
+const UNLINKED_KEEP_HOURS = 24;
+
+// First bytes of each allowed type, so a renamed .exe can't pass as a .pdf.
+const SIGNATURES = {
+  'image/jpeg': [0xff, 0xd8, 0xff],
+  'image/png': [0x89, 0x50, 0x4e, 0x47],
+  'application/pdf': [0x25, 0x50, 0x44, 0x46], // %PDF
+};
 
 const uploadRequestSchema = z.object({
   fileName: z.string().trim().min(1, 'fileName is required').max(200, 'fileName is too long'),
@@ -32,7 +37,7 @@ const uploadRequestSchema = z.object({
     .number({ error: 'sizeBytes must be a number' })
     .int()
     .min(1, 'File is empty')
-    .max(MAX_FILE_BYTES, 'File is larger than 10 MB'),
+    .max(MAX_FILE_BYTES, 'File is larger than 5 MB'),
 });
 
 /**
@@ -56,44 +61,49 @@ export function validateUploadRequest(body) {
   return { fileName: safeName, mimeType, sizeBytes };
 }
 
-function requireBucket() {
-  if (!bucket) {
-    throw new AppError(503, 'File storage is not configured on the server', 'STORAGE_UNAVAILABLE');
-  }
-  return bucket;
+/** True if the file's first bytes match its declared type. */
+export function contentMatchesType(buffer, mimeType) {
+  const signature = SIGNATURES[mimeType];
+  return Boolean(signature) && buffer.length >= signature.length && signature.every((byte, i) => buffer[i] === byte);
 }
 
 /**
- * Step 1 of an upload: returns a signed link the browser can PUT the file to.
+ * Saves an uploaded file. `content` is the raw file (Buffer), `rawFileName` comes from the X-File-Name header.
+ * Returns { attachmentId, fileName, mimeType, sizeBytes }.
  */
-export async function createUploadUrl(user, body) {
-  const { fileName, mimeType, sizeBytes } = validateUploadRequest(body);
-  const storage = requireBucket();
+export async function saveUpload(user, { rawFileName, mimeType, content }) {
+  let decodedName = rawFileName ?? '';
+  try {
+    decodedName = decodeURIComponent(decodedName);
+  } catch {
+    // not URI-encoded — use as is
+  }
 
-  const storagePath = `reports/${user.id}/${randomUUID()}-${fileName}`;
+  const buffer = Buffer.isBuffer(content) ? content : Buffer.alloc(0);
+  const { fileName, sizeBytes } = validateUploadRequest({
+    fileName: decodedName,
+    mimeType,
+    sizeBytes: buffer.length,
+  });
+  if (!contentMatchesType(buffer, mimeType)) {
+    throw BadRequest(`The file is not a real ${ALLOWED_TYPES[mimeType][0].slice(1).toUpperCase()}`);
+  }
 
-  const inserted = await query(
-    `INSERT INTO attachments (uploaded_by, file_name, storage_path, mime_type, size_bytes)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id;`,
-    [user.id, fileName, storagePath, mimeType, sizeBytes],
+  // Housekeeping: drop old uploads that never made it onto a report.
+  await query(
+    `DELETE FROM attachments
+     WHERE report_id IS NULL AND created_at < NOW() - make_interval(hours => $1);`,
+    [UNLINKED_KEEP_HOURS],
   );
 
-  const expires = Date.now() + UPLOAD_LINK_MINUTES * 60 * 1000;
-  const [uploadUrl] = await storage.file(storagePath).getSignedUrl({
-    version: 'v4',
-    action: 'write',
-    expires,
-    contentType: mimeType,
-  });
+  const inserted = await query(
+    `INSERT INTO attachments (uploaded_by, file_name, storage_path, mime_type, size_bytes, content)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id;`,
+    [user.id, fileName, `db:${randomUUID()}`, mimeType, sizeBytes, buffer],
+  );
 
-  return {
-    attachmentId: inserted.rows[0].id,
-    uploadUrl,
-    method: 'PUT',
-    headers: { 'Content-Type': mimeType }, // the browser must send exactly this header
-    expiresAt: new Date(expires).toISOString(),
-  };
+  return { attachmentId: inserted.rows[0].id, fileName, mimeType, sizeBytes };
 }
 
 /**
@@ -114,7 +124,7 @@ export async function linkAttachments(client, { reportId, userId, attachmentIds 
   if (ids.length > 0) {
     // Only files this head uploaded, that are free or already on this report.
     const owned = await client.query(
-      `SELECT id, storage_path, mime_type, report_id
+      `SELECT id
        FROM attachments
        WHERE id = ANY($1::uuid[])
          AND uploaded_by = $2
@@ -122,12 +132,7 @@ export async function linkAttachments(client, { reportId, userId, attachmentIds 
       [ids, userId, reportId],
     );
     if (owned.rows.length !== ids.length) {
-      throw BadRequest('One or more attachments are invalid or belong to another report');
-    }
-
-    // New files: make sure they were really uploaded and match what was promised.
-    for (const row of owned.rows.filter((r) => r.report_id === null)) {
-      await verifyStoredFile(row);
+      throw BadRequest('One or more attachments are invalid, expired or belong to another report. Please upload them again.');
     }
   }
 
@@ -142,32 +147,16 @@ export async function linkAttachments(client, { reportId, userId, attachmentIds 
   );
 }
 
-async function verifyStoredFile({ storage_path: storagePath, mime_type: mimeType }) {
-  if (!bucket) return; // local development without Firebase Storage
-
-  const file = bucket.file(storagePath);
-  const [exists] = await file.exists();
-  if (!exists) {
-    throw BadRequest('An attachment was not uploaded. Please upload it again.');
-  }
-
-  const [metadata] = await file.getMetadata();
-  if (Number(metadata.size) > MAX_FILE_BYTES || metadata.contentType !== mimeType) {
-    await file.delete({ ignoreNotFound: true });
-    throw BadRequest('An uploaded file is larger than 10 MB or not the promised type');
-  }
-}
-
 /**
- * Returns a 5-minute link to view/download a file.
- * Heads: only files on their own reports (or their own not-yet-linked uploads).
+ * Returns { fileName, mimeType, content } for viewing/downloading a file.
+ * Heads: only files on their own reports (or their own not-yet-linked uploads). The CEO: every file.
  * Anyone else gets 404, so they can't even tell the file exists.
  */
-export async function createDownloadUrl(user, attachmentId) {
+export async function getFile(user, attachmentId) {
   if (!isUuid(attachmentId)) throw NotFound('Attachment not found');
 
   const result = await query(
-    `SELECT a.storage_path, a.file_name, a.uploaded_by, r.user_id AS report_owner
+    `SELECT a.file_name, a.mime_type, a.content, a.uploaded_by, r.user_id AS report_owner
      FROM attachments a
      LEFT JOIN reports r ON r.id = a.report_id
      WHERE a.id = $1;`,
@@ -176,18 +165,13 @@ export async function createDownloadUrl(user, attachmentId) {
   const row = result.rows[0];
   const owner = row?.report_owner ?? row?.uploaded_by;
 
-  // Member 3: add CEO access here (the CEO may open every report's files).
-  if (!row || owner !== user.id) {
+  if (!row || (user.role !== 'CEO' && owner !== user.id)) {
     throw NotFound('Attachment not found');
   }
+  if (!row.content) {
+    // Uploaded under the old Firebase Storage setup — the file isn't in the database.
+    throw NotFound('This file is no longer available. Please upload it again.');
+  }
 
-  const expires = Date.now() + DOWNLOAD_LINK_MINUTES * 60 * 1000;
-  const [url] = await requireBucket().file(row.storage_path).getSignedUrl({
-    version: 'v4',
-    action: 'read',
-    expires,
-    responseDisposition: `inline; filename="${row.file_name}"`,
-  });
-
-  return { url, fileName: row.file_name, expiresAt: new Date(expires).toISOString() };
+  return { fileName: row.file_name, mimeType: row.mime_type, content: row.content };
 }

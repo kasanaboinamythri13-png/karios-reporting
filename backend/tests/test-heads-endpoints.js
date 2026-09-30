@@ -176,10 +176,25 @@ try {
     assert.equal((await api.post('/api/reports').set(as('ceo')).send({ data: {} })).status, 403);
   });
 
-  await step('Attachment upload without Firebase Storage configured → 503 (clear message)', async () => {
-    const res = await api.post('/api/attachments/upload-url').set(as('finance'))
-      .send({ fileName: 'invoice.pdf', mimeType: 'application/pdf', sizeBytes: 2048 });
-    assert.equal(res.status, 503);
+  await step('Attachment: upload → owner and CEO can open it, other heads get 404, fake PDF refused', async () => {
+    const pdf = Buffer.from('%PDF-1.4\n% test invoice\n');
+    const up = await api.post('/api/attachments').set(as('finance'))
+      .set('Content-Type', 'application/pdf').set('X-File-Name', encodeURIComponent('invoice q3.pdf'))
+      .send(pdf);
+    assert.equal(up.status, 201);
+    assert.equal(up.body.fileName, 'invoice_q3.pdf');
+
+    const own = await api.get(`/api/attachments/${up.body.attachmentId}/file`).set(as('finance'));
+    assert.equal(own.status, 200);
+    assert.equal(own.headers['content-type'], 'application/pdf');
+    assert.equal((await api.get(`/api/attachments/${up.body.attachmentId}/file`).set(as('ceo'))).status, 200);
+    assert.equal((await api.get(`/api/attachments/${up.body.attachmentId}/file`).set(as('sales'))).status, 404);
+
+    const fake = await api.post('/api/attachments').set(as('finance'))
+      .set('Content-Type', 'application/pdf').set('X-File-Name', 'virus.pdf').send(Buffer.from('MZ not a pdf'));
+    assert.equal(fake.status, 400);
+
+    await query('DELETE FROM attachments WHERE id = $1;', [up.body.attachmentId]);
   });
 
   console.log(`\n🚀 All ${passed} Department Heads checks passed against the real database.\n`);

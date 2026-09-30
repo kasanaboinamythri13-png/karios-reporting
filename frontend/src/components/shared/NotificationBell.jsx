@@ -50,7 +50,7 @@ export default function NotificationBell() {
       if (appUser?.role === "CEO") {
         navigate(`/ceo/reports/${n.report_id}`);
       } else {
-        navigate(`/head/reports/${n.report_id}`);
+        navigate(`/reports/${n.report_id}`);
       }
     }
   };
@@ -60,11 +60,16 @@ export default function NotificationBell() {
       <button
         className="notif-btn"
         id="notif-bell-btn"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ""}`}
+        title="Notifications"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-1.7 1.7A1 1 0 0 0 4 19.4h16a1 1 0 0 0 .7-1.7Z"
+            fill="currentColor"
+          />
         </svg>
         {unread > 0 && (
           <span className="notif-badge">{unread > 9 ? "9+" : unread}</span>

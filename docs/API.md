@@ -26,8 +26,8 @@ Errors always look like:
 | ✅ | Member 1 | GET | `/reports/:id` | owner / CEO | Report detail |
 | ✅ | Member 3 | POST | `/reports/:id/review` | CEO | `{ status: "APPROVED" \| "REJECTED", comment }` |
 | ✅ | Member 3 | GET | `/dashboard/overview?date=` | CEO | Submitted / missing / blockers / metrics |
-| ✅ | Member 2 | POST | `/attachments/upload-url` | HEAD | Signed upload URL (checks type + size) |
-| 🟡 | Member 2 | GET | `/attachments/:id/url` | owner / CEO | Short-lived signed download URL (CEO access: Member 3) |
+| ✅ | Member 2 | POST | `/attachments` | HEAD | Upload a file (raw body; checks type, size + real content) |
+| ✅ | Member 2 | GET | `/attachments/:id/file` | owner / CEO | The file itself |
 | ✅ | Member 2 | GET | `/notifications` | any | Own notifications |
 | ✅ | Member 2 | PATCH | `/notifications/:id/read` | any | Mark as read |
 | ✅ | Member 2 | PATCH | `/notifications/read-all` | any | Mark all own notifications as read |
@@ -64,7 +64,7 @@ When submitted, `report` is the full report (same shape as `GET /reports/:id`) a
 ```json
 {
   "data": { "newLeads": 12, "revenueClosed": 14500, "blockers": "Waiting for pricing approval" },
-  "attachmentIds": ["<id from upload-url>"]
+  "attachmentIds": ["<attachmentId from POST /attachments>"]
 }
 ```
 | Response | When |
@@ -98,15 +98,17 @@ Heads always get only their own reports.
 Full report including `data`, `status`, `review_comment`, `reviewed_at`, `reviewer_title`, `attachments`.
 Another head's report → `404`.
 
-### Attachments (upload in 3 steps)
-1. `POST /attachments/upload-url` with `{ "fileName": "invoice.pdf", "mimeType": "application/pdf", "sizeBytes": 20480 }`
-   → `201 { attachmentId, uploadUrl, method: "PUT", headers: { "Content-Type": "application/pdf" }, expiresAt }`
-2. Browser: `PUT uploadUrl` with the file as the body and exactly those `headers` (link valid 10 min).
-3. Include `attachmentId` in `attachmentIds` when submitting / editing the report.
+### Attachments (stored in the database)
+1. `POST /attachments` with the **file as the raw body** and headers
+   `Content-Type: application/pdf` (the file's type) and `X-File-Name: <URI-encoded file name>`
+   → `201 { attachmentId, fileName, mimeType, sizeBytes }`
+2. Include `attachmentId` in `attachmentIds` when submitting / editing the report.
+   Uploads not added to a report within 24 hours are deleted.
 
-Rules: JPG / PNG / PDF only, extension must match the type, ≤ 10 MB, ≤ 5 per report.
-`GET /attachments/:id/url` → `{ url, fileName, expiresAt }` (link valid 5 min). Someone else's file → `404`.
-If Firebase Storage isn't configured on the server → `503 STORAGE_UNAVAILABLE`.
+Rules: JPG / PNG / PDF only, extension must match the type, the content must really be that type,
+≤ 5 MB (`413` if bigger), ≤ 5 per report.
+`GET /attachments/:id/file` → the file (`Content-Type` = its type). The report's head and the CEO only;
+anyone else → `404`.
 
 ### Notifications
 `GET /notifications` → `{ notifications: [...], unreadCount }` (newest 50).

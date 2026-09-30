@@ -1,10 +1,10 @@
 import { useRef } from 'react';
-import { ACCEPT, MAX_FILES_PER_REPORT, checkFile, requestUploadUrl, uploadToStorage } from '../api/attachments.js';
+import { ACCEPT, MAX_FILES_PER_REPORT, MAX_FILE_LABEL, checkFile, uploadFile } from '../api/attachments.js';
 import { formatFileSize } from '../utils/files.js';
 
-// Lets a head add up to 5 files (JPG / PNG / PDF, 10 MB each) to a report.
+// Lets a head add up to 5 files (JPG / PNG / PDF, 5 MB each) to a report.
 // items: [{ key, id?, fileName, sizeBytes, status: 'uploading' | 'done' | 'error', progress, error }]
-// Each new file is uploaded straight away: upload link from the backend → PUT to storage.
+// Each new file is uploaded to the backend straight away.
 export default function AttachmentPicker({ items, setItems, disabled }) {
   const inputRef = useRef(null);
   const slotsLeft = MAX_FILES_PER_REPORT - items.length;
@@ -13,13 +13,10 @@ export default function AttachmentPicker({ items, setItems, disabled }) {
 
   async function upload(file, key) {
     try {
-      const link = await requestUploadUrl(file);
-      update(key, { id: link.attachmentId });
-      await uploadToStorage(link, file, (progress) => update(key, { progress }));
-      update(key, { status: 'done', progress: 100 });
+      const saved = await uploadFile(file, (progress) => update(key, { progress }));
+      update(key, { id: saved.attachmentId, status: 'done', progress: 100 });
     } catch (err) {
-      const message = err.status === 503 ? 'File uploads are not available right now' : err.message;
-      update(key, { status: 'error', error: message });
+      update(key, { status: 'error', error: err.message });
     }
   }
 
@@ -46,7 +43,7 @@ export default function AttachmentPicker({ items, setItems, disabled }) {
     <div className="attachments">
       <div className="attachments-head">
         <strong>Attachments</strong>
-        <span className="muted small">Optional · JPG, PNG, PDF · max {MAX_FILES_PER_REPORT} · 10 MB each</span>
+        <span className="muted small">Optional · JPG, PNG, PDF · max {MAX_FILES_PER_REPORT} · {MAX_FILE_LABEL} each</span>
       </div>
 
       {items.length > 0 && (

@@ -80,6 +80,8 @@ async function runMigrations() {
 
   await query(`ALTER TABLE attachments ADD COLUMN IF NOT EXISTS uploaded_by UUID REFERENCES users(id) ON DELETE CASCADE;`);
   await query(`ALTER TABLE attachments ALTER COLUMN report_id DROP NOT NULL;`);
+  // The file itself (attachments are stored in the database)
+  await query(`ALTER TABLE attachments ADD COLUMN IF NOT EXISTS content BYTEA;`);
 
   // 4. Notifications Table
   console.log('[Migration] Creating notifications table...');

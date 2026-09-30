@@ -4,8 +4,6 @@ import { useAuth } from '../../auth/AuthContext.jsx';
 import { getTodayReport, listReports } from '../../api/reports.js';
 import { useApi } from '../../hooks/useApi.js';
 import StatusBadge from '../../components/StatusBadge.jsx';
-import NotificationBell from '../../components/NotificationBell.jsx';
-import ProfileMenu from '../../components/ProfileMenu.jsx';
 import { ErrorBanner, Loading } from '../../components/Feedback.jsx';
 import { formatDate, formatDateTime, formatLongDate } from '../../utils/date.js';
 import { formatUSD } from '../../utils/currency.js';
@@ -35,10 +33,6 @@ export default function HeadHomePage() {
     <>
       <div className="page-head">
         <h1 className="page-title">Home / Overview</h1>
-        <div className="header-actions">
-          <NotificationBell />
-          <ProfileMenu />
-        </div>
       </div>
       {flash && <div className="alert alert-success">{flash}</div>}
       <ErrorBanner error={error} onRetry={reload} />

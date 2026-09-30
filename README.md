@@ -70,7 +70,25 @@ npm install
 npm run dev          # → http://localhost:5173
 ```
 
-Until Firebase login is ready, the login page has **development buttons** to continue as any head or the CEO.
+### Secrets (ask the project owner — never commit them)
+`frontend/.env.example` already has everything the frontend needs. For `backend/.env`, get these three values
+from the project owner through a private channel (not Git, not a public chat):
+
+```
+DATABASE_URL=...
+FIREBASE_CLIENT_EMAIL=...
+FIREBASE_PRIVATE_KEY="..."
+```
+
+### Attachments (file uploads)
+Files are stored **in the database** (`attachments.content`) — no Firebase Storage, no card, nothing to configure.
+Everyone shares the same Neon database, so once `DATABASE_URL` is in `backend/.env`, uploads work locally.
+
+Rules: JPG / PNG / PDF, max 5 MB each, max 5 per report. Uploads not added to a report within 24 hours are deleted.
+
+**New database only** (already done on the shared one): `cd backend && npm run db:attachments`
+— adds the attachment columns. Safe to run again; it changes nothing else.
+Don't run `npm run db:migrate` / `db:reset` on the shared database — they add sample data / delete everything.
 
 ## Progress
 - [x] Project structure
