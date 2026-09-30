@@ -1,6 +1,6 @@
 // Every call to the backend goes through here.
 // The login token is attached automatically (Firebase ID token, or a dev token in development).
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 let getToken = null;
 let onUnauthorized = null;
@@ -25,31 +25,37 @@ export class ApiError extends Error {
   }
 }
 
+// The login token for the Authorization header (Firebase first, then dev fallbacks), or null.
+export async function getAuthToken() {
+  let token = getToken ? await getToken() : null;
+  if (!token) {
+    try {
+      const { getAuth } = await import('firebase/auth');
+      const fbUser = getAuth().currentUser;
+      if (fbUser) token = await fbUser.getIdToken();
+    } catch {}
+  }
+  if (!token) {
+    try {
+      const s = sessionStorage.getItem('karios_mock_user');
+      if (s) {
+        const u = JSON.parse(s);
+        token = u.role === 'CEO' ? 'dev-ceo' : `dev-${(u.department || u.role || 'user').toLowerCase()}`;
+      }
+    } catch {}
+  }
+  if (!token) {
+    try {
+      token = localStorage.getItem('karios-dev-token');
+    } catch {}
+  }
+  return token;
+}
+
 export async function api(path, { method = 'GET', body, headers = {} } = {}) {
   let res;
   try {
-    let token = getToken ? await getToken() : null;
-    if (!token) {
-      try {
-        const { getAuth } = await import('firebase/auth');
-        const fbUser = getAuth().currentUser;
-        if (fbUser) token = await fbUser.getIdToken();
-      } catch {}
-    }
-    if (!token) {
-      try {
-        const s = sessionStorage.getItem('karios_mock_user');
-        if (s) {
-          const u = JSON.parse(s);
-          token = u.role === 'CEO' ? 'dev-ceo' : `dev-${(u.department || u.role || 'user').toLowerCase()}`;
-        }
-      } catch {}
-    }
-    if (!token) {
-      try {
-        token = localStorage.getItem('karios-dev-token');
-      } catch {}
-    }
+    const token = await getAuthToken();
 
     res = await fetch(`${API_URL}${path}`, {
       method,

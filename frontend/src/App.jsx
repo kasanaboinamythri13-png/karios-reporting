@@ -1,6 +1,6 @@
 // src/App.jsx — Root router with role-based guards
 import React from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { useAuth }     from "./context/useAuth";
 import { ThemeProvider }  from "./context/ThemeContext";
@@ -43,6 +43,22 @@ function RootRedirect() {
   return <Navigate to={currentUser.role === "CEO" ? "/ceo" : "/head"} replace />;
 }
 
+// Pages used by both roles get the CEO or Head layout, depending on who is signed in
+function RoleLayout() {
+  const { appUser, user } = useAuth();
+  const currentUser = appUser || user;
+  return currentUser?.role === "CEO" ? <CeoLayout /> : <HeadLayout />;
+}
+
+// The CEO has their own report page (with Approve / Reject)
+function ReportRoute() {
+  const { appUser, user } = useAuth();
+  const { id } = useParams();
+  const currentUser = appUser || user;
+  if (currentUser?.role === "CEO") return <Navigate to={`/ceo/reports/${id}`} replace />;
+  return <ReportDetailPage />;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -65,10 +81,12 @@ function AppRoutes() {
         <Route path="history"     element={<ReportHistoryPage />} />
       </Route>
 
-      {/* Shared routes */}
-      <Route path="/reports/:id"   element={<ReportDetailPage />} />
-      <Route path="/notifications" element={<NotificationsPage />} />
-      <Route path="/profile"       element={<ProfilePage />} />
+      {/* Shared routes — shown inside the signed-in user's layout (sidebar + top bar) */}
+      <Route element={<RoleLayout />}>
+        <Route path="/reports/:id"   element={<ReportRoute />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/profile"       element={<ProfilePage />} />
+      </Route>
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

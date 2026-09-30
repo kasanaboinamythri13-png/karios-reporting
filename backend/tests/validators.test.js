@@ -21,7 +21,7 @@ test('GET /api/reports/form-schema without login → 401', async () => {
   assert.equal(res.status, 401);
 });
 
-test('POST /api/attachments/upload-url without login → 401', async () => {
-  const res = await request(app).post('/api/attachments/upload-url').send({});
+test('POST /api/attachments without login → 401', async () => {
+  const res = await request(app).post('/api/attachments').send({});
   assert.equal(res.status, 401);
 });

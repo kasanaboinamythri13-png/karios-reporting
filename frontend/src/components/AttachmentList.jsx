@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { getDownloadUrl } from '../api/attachments.js';
+import { getFileUrl } from '../api/attachments.js';
 import { formatFileSize } from '../utils/files.js';
 
-// Read-only list of a report's files. The view link is fetched on click
-// because it only works for 5 minutes.
+// Read-only list of a report's files. The file is downloaded on click (with the login token)
+// and shown in a new tab.
 export default function AttachmentList({ attachments }) {
   const [error, setError] = useState(null);
   const [openingId, setOpeningId] = useState(null);
@@ -16,12 +16,13 @@ export default function AttachmentList({ attachments }) {
     // Open the tab now (inside the click) so pop-up blockers allow it, then point it at the file.
     const tab = window.open('', '_blank');
     try {
-      const { url } = await getDownloadUrl(att.id);
+      const url = await getFileUrl(att.id);
       if (tab) tab.location.href = url;
       else window.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60_000); // free memory once the tab has loaded it
     } catch (err) {
       tab?.close();
-      setError(err.status === 503 ? 'File storage is not available right now.' : err.message);
+      setError(err.message);
     } finally {
       setOpeningId(null);
     }

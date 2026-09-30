@@ -16,6 +16,33 @@ const DEV_ACCOUNTS = [
   { label: "Finance",   email: "finance@karios.local" },
 ];
 
+// Show / hide password icons (outline style, follow the button's text colour)
+const iconProps = {
+  width: 18, height: 18, viewBox: "0 0 24 24", fill: "none",
+  stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
+  "aria-hidden": true,
+};
+
+function EyeIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 8 10 8a17.6 17.6 0 0 1-2.16 3.19" />
+      <path d="M6.61 6.61A17.4 17.4 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.39-1.61" />
+      <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+      <line x1="2" y1="2" x2="22" y2="22" />
+    </svg>
+  );
+}
+
 export default function LoginPage() {
   const [email,    setEmail]    = useState("ceo@karios.local");
   const [password, setPassword] = useState("Password123!");
@@ -129,13 +156,13 @@ export default function LoginPage() {
                 id="toggle-password-btn"
                 aria-label={showPass ? "Hide password" : "Show password"}
                 style={{
-                  position: "absolute", right: 12, top: "50%",
+                  position: "absolute", right: 10, top: "50%",
                   transform: "translateY(-50%)",
                   background: "none", border: "none", cursor: "pointer",
-                  color: "var(--color-text-muted)", fontSize: 16, lineHeight: 1,
+                  color: "var(--color-text-muted)", padding: 4, lineHeight: 0,
                 }}
               >
-                {showPass ? "🙈" : "👁️"}
+                {showPass ? <EyeOffIcon /> : <EyeIcon />}
               </button>
             </div>
           </div>

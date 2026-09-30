@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../services/api";
 import StatusBadge from "../../components/shared/StatusBadge";
+import AttachmentList from "../../components/AttachmentList";
 import { useToast } from "../../context/ToastContext";
 import { format } from "date-fns";
 import { formatUSD } from "../../utils/currency";
@@ -257,14 +258,7 @@ export default function CeoReportDetailPage() {
                 <div className="report-section__title" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 8 }}>
                   Attachments
                 </div>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  {report.attachments.map((att) => (
-                    <a key={att.id || att.key} href={att.url || "#"} target="_blank" rel="noopener noreferrer"
-                      className="btn btn--outline btn--sm">
-                      📎 {att.filename || att.name || att.id}
-                    </a>
-                  ))}
-                </div>
+                <AttachmentList attachments={report.attachments} />
               </div>
             )}
           </div>

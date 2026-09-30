@@ -876,38 +876,57 @@ body {
 }
 
 /* ===================== Notification Bell ===================== */
+/* Soft lavender circle with a solid blue bell. ":not(:disabled)" is needed so the
+   global "button:hover" rule in styles/index.css can't turn it solid blue. */
 .notif-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  transition: var(--transition);
+  width: 40px;
+  height: 40px;
   padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #efebfe;
+  color: #3d5de0;
+  cursor: pointer;
+  transition: var(--transition);
   outline: none;
-}
-
-.notif-btn:hover,
-.notif-btn.active {
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  border-color: var(--color-primary);
 }
 
 .notif-btn:focus-visible {
   outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .notif-btn svg {
-  stroke: currentColor;
   display: block;
+}
+
+.notif-btn:hover:not(:disabled) {
+  background: #e2dcfd;
+  border: none;
+  color: #3d5de0;
+}
+
+[data-theme="dark"] .notif-btn {
+  background: #2d2a55;
+  color: #8fa4ff;
+}
+
+[data-theme="dark"] .notif-btn:hover:not(:disabled) {
+  background: #3a3670;
+  color: #a9b9ff;
+}
+
+/* Panel open: solid blue with a white bell (both themes) */
+.notif-btn[aria-expanded="true"],
+.notif-btn[aria-expanded="true"]:hover:not(:disabled),
+[data-theme="dark"] .notif-btn[aria-expanded="true"],
+[data-theme="dark"] .notif-btn[aria-expanded="true"]:hover:not(:disabled) {
+  background: #3d5de0;
+  color: #ffffff;
 }
 
 .notif-badge {
