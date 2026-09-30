@@ -1,7 +1,5 @@
-// src/components/shared/Sidebar.jsx
 import React from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/useAuth";
+import { NavLink } from "react-router-dom";
 import KariosLogo from "./KariosLogo";
 
 // SVG Icons
@@ -13,26 +11,18 @@ const Icons = {
 };
 
 export default function Sidebar({ role }) {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
-
   const isCEO = role === "CEO";
 
   const navItems = isCEO
     ? [
-        { to: "/ceo", label: "Overview", icon: Icons.overview, end: true },
-        { to: "/ceo/reports", label: "Reports",  icon: Icons.reports },
+        { to: "/ceo", label: "Home", icon: Icons.home, end: true },
+        { to: "/ceo/reports", label: "Reports", icon: Icons.reports },
       ]
     : [
         { to: "/head", label: "Home", icon: Icons.home, end: true },
         { to: "/head/report", label: "Submit Report", icon: Icons.reports },
         { to: "/head/history", label: "My Reports", icon: Icons.reports },
       ];
-
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
 
   return (
     <aside className="sidebar">
@@ -43,9 +33,6 @@ export default function Sidebar({ role }) {
 
       {/* Navigation */}
       <nav className="sidebar__nav">
-        {isCEO && (
-          <span className="sidebar__nav-section">CEO Admin</span>
-        )}
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -60,19 +47,6 @@ export default function Sidebar({ role }) {
           </NavLink>
         ))}
       </nav>
-
-      {/* Footer */}
-      <div className="sidebar__footer">
-        <button
-          className="sidebar__nav-item"
-          onClick={handleLogout}
-          id="logout-btn"
-          style={{ width: "100%", justifyContent: "flex-start", color: "var(--color-text-muted)" }}
-        >
-          {Icons.logout}
-          Log out
-        </button>
-      </div>
     </aside>
   );
 }

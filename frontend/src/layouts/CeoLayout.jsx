@@ -24,7 +24,7 @@ export default function CeoLayout() {
     <div className="app-layout">
       <Sidebar role="CEO" />
       <div className="main-content">
-        <TopBar title="Karios Admin" subtitle="CEO Dashboard" />
+        <TopBar title="Karios Reporting" subtitle="CEO Portal" />
         <Outlet />
       </div>
     </div>
