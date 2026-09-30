@@ -8,24 +8,39 @@ import { ToastProvider }  from "./context/ToastContext";
 
 // Layouts
 import CeoLayout from "./layouts/CeoLayout";
+import HeadLayout from "./layouts/HeadLayout";
 
-// Pages
+// Pages - Auth
 import LoginPage           from "./pages/LoginPage";
+
+// Pages - CEO
 import CeoOverviewPage     from "./pages/ceo/CeoOverviewPage";
 import CeoReportsPage      from "./pages/ceo/CeoReportsPage";
 import CeoReportDetailPage from "./pages/ceo/CeoReportDetailPage";
 import CeoProfilePage      from "./pages/ceo/CeoProfilePage";
 
+// Pages - Department Head
+import HeadHomePage        from "./pages/head/HeadHomePage";
+import ReportFormPage      from "./pages/head/ReportFormPage";
+import ReportHistoryPage   from "./pages/head/ReportHistoryPage";
+
+// Pages - Shared
+import ReportDetailPage    from "./pages/shared/ReportDetailPage";
+import NotificationsPage   from "./pages/shared/NotificationsPage";
+import ProfilePage         from "./pages/shared/ProfilePage";
+
 // Smart root redirect based on role
 function RootRedirect() {
-  const { appUser, loading } = useAuth();
+  const { appUser, user, loading } = useAuth();
+  const currentUser = appUser || user;
+
   if (loading) return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div className="loading-spinner" />
     </div>
   );
-  if (!appUser) return <Navigate to="/login" replace />;
-  return <Navigate to="/ceo" replace />;
+  if (!currentUser) return <Navigate to="/login" replace />;
+  return <Navigate to={currentUser.role === "CEO" ? "/ceo" : "/head"} replace />;
 }
 
 function AppRoutes() {
@@ -41,6 +56,19 @@ function AppRoutes() {
         <Route path="reports/:id" element={<CeoReportDetailPage />} />
         <Route path="profile"     element={<CeoProfilePage />} />
       </Route>
+
+      {/* Head Area */}
+      <Route path="/head" element={<HeadLayout />}>
+        <Route index              element={<HeadHomePage />} />
+        <Route path="report"      element={<ReportFormPage />} />
+        <Route path="reports"     element={<ReportHistoryPage />} />
+        <Route path="history"     element={<ReportHistoryPage />} />
+      </Route>
+
+      {/* Shared routes */}
+      <Route path="/reports/:id"   element={<ReportDetailPage />} />
+      <Route path="/notifications" element={<NotificationsPage />} />
+      <Route path="/profile"       element={<ProfilePage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

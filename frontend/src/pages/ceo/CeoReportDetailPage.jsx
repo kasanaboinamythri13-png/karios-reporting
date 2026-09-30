@@ -5,6 +5,62 @@ import api from "../../services/api";
 import StatusBadge from "../../components/shared/StatusBadge";
 import { useToast } from "../../context/ToastContext";
 import { format } from "date-fns";
+import { formatUSD } from "../../utils/currency";
+
+const FORM_FIELDS = {
+  DEVELOPMENT: [
+    { key: "tasksCompleted", label: "Tasks Completed", type: "textarea", required: true },
+    { key: "tasksInProgress", label: "Tasks In Progress", type: "textarea" },
+    { key: "bugsFixed", label: "Bugs Fixed", type: "number" },
+    { key: "deployments", label: "Deployments", type: "number" },
+    { key: "blockers", label: "Blockers", type: "textarea", column: "blockers" },
+    { key: "planTomorrow", label: "Plan for Tomorrow", type: "textarea" },
+  ],
+  SALES: [
+    { key: "newLeads", label: "New Leads", type: "number", required: true, column: "leads" },
+    { key: "followUps", label: "Follow-ups", type: "number" },
+    { key: "dealsClosed", label: "Deals Closed", type: "number" },
+    { key: "revenueClosed", label: "Revenue Closed", type: "currency", column: "revenue_closed" },
+    { key: "pipelineValue", label: "Pipeline Value", type: "currency" },
+    { key: "blockers", label: "Blockers", type: "textarea", column: "blockers" },
+    { key: "planTomorrow", label: "Plan for Tomorrow", type: "textarea" },
+  ],
+  MARKETING: [
+    { key: "activeCampaigns", label: "Active Campaigns", type: "number", required: true },
+    { key: "spend", label: "Spend", type: "currency", column: "marketing_spend" },
+    { key: "impressions", label: "Impressions", type: "number" },
+    { key: "clicks", label: "Clicks", type: "number" },
+    { key: "leadsGenerated", label: "Leads Generated", type: "number", column: "leads" },
+    { key: "blockers", label: "Blockers", type: "textarea", column: "blockers" },
+    { key: "planTomorrow", label: "Plan for Tomorrow", type: "textarea" },
+  ],
+  FINANCE: [
+    { key: "collections", label: "Collections", type: "currency", required: true, column: "collections" },
+    { key: "paymentsMade", label: "Payments Made", type: "currency" },
+    { key: "expenses", label: "Expenses", type: "currency" },
+    { key: "pendingInvoices", label: "Pending Invoices", type: "number" },
+    { key: "cashPosition", label: "Cash Position", type: "currency" },
+    { key: "blockers", label: "Blockers", type: "textarea", column: "blockers" },
+    { key: "notes", label: "Notes", type: "textarea" },
+  ],
+};
+
+function getFieldValue(report, key, column) {
+  if (!report) return null;
+  const data = report.data || {};
+
+  if (data[key] != null && data[key] !== "") return data[key];
+  if (report[key] != null && report[key] !== "") return report[key];
+
+  if (column && report[column] != null && report[column] !== "") return report[column];
+  if (column && data[column] != null && data[column] !== "") return data[column];
+
+  const snake = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+  if (data[snake] != null && data[snake] !== "") return data[snake];
+  if (report[snake] != null && report[snake] !== "") return report[snake];
+
+  return null;
+}
 
 export default function CeoReportDetailPage() {
   const { id }    = useParams();
@@ -18,7 +74,8 @@ export default function CeoReportDetailPage() {
 
   const fetchReport = useCallback(async () => {
     try {
-      const { data } = await api.get(`/reports/${id}`);
+      const res = await api.get(`/reports/${id}`);
+      const data = res.data?.report || res.data || res;
       setReport(data);
     } catch {
       setReport(null);
@@ -47,49 +104,6 @@ export default function CeoReportDetailPage() {
     }
   };
 
-  // ── Department field maps ────────────────────────────────────────────────
-  const fieldsByDept = {
-    DEVELOPMENT: [
-      { label: "Tasks Completed",    value: report?.tasks_completed },
-      { label: "Tasks In Progress",  value: report?.tasks_in_progress },
-      { label: "Bugs Fixed",         value: report?.bugs_fixed },
-      { label: "Deployments",        value: report?.deployments },
-      { label: "PRs Merged",         value: report?.prs_merged },
-      { label: "Code Reviews Done",  value: report?.code_reviews },
-      { label: "Sprint Progress",    value: report?.sprint_progress != null ? `${report.sprint_progress}%` : null },
-      { label: "Tech Debt Notes",    value: report?.tech_debt_notes },
-    ],
-    SALES: [
-      { label: "Calls Made",          value: report?.calls_made },
-      { label: "Meetings Held",       value: report?.meetings_held },
-      { label: "Leads Generated",     value: report?.leads },
-      { label: "Proposals Sent",      value: report?.proposals_sent },
-      { label: "Deals Closed",        value: report?.deals_closed },
-      { label: "Revenue Closed",      value: report?.revenue_closed != null ? `$${Number(report.revenue_closed).toLocaleString()}` : null },
-      { label: "Pipeline Value",      value: report?.pipeline_value  != null ? `$${Number(report.pipeline_value).toLocaleString()}`  : null },
-      { label: "Follow-ups Pending",  value: report?.follow_ups_pending },
-    ],
-    MARKETING: [
-      { label: "Campaigns Active",    value: report?.campaigns_active },
-      { label: "Impressions",         value: report?.impressions?.toLocaleString() },
-      { label: "Clicks",              value: report?.clicks?.toLocaleString() },
-      { label: "Conversions",         value: report?.conversions },
-      { label: "Leads Generated",     value: report?.leads },
-      { label: "Marketing Spend",     value: report?.marketing_spend != null ? `$${Number(report.marketing_spend).toLocaleString()}` : null },
-      { label: "Social Media Posts",  value: report?.social_posts },
-      { label: "Email Campaigns",     value: report?.email_campaigns },
-    ],
-    FINANCE: [
-      { label: "Revenue",             value: report?.revenue       != null ? `$${Number(report.revenue).toLocaleString()}`       : null },
-      { label: "Expenses",            value: report?.expenses      != null ? `$${Number(report.expenses).toLocaleString()}`      : null },
-      { label: "Net Profit",          value: report?.net_profit    != null ? `$${Number(report.net_profit).toLocaleString()}`    : null },
-      { label: "Collections",         value: report?.collections   != null ? `$${Number(report.collections).toLocaleString()}`   : null },
-      { label: "Pending Invoices",    value: report?.pending_invoices },
-      { label: "Payments Made",       value: report?.payments_made != null ? `$${Number(report.payments_made).toLocaleString()}` : null },
-      { label: "Budget Variance",     value: report?.budget_variance != null ? `${report.budget_variance}%`                     : null },
-    ],
-  };
-
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
       <div className="loading-spinner" />
@@ -108,10 +122,31 @@ export default function CeoReportDetailPage() {
     </div>
   );
 
-  const dept   = report.department;
-  const fields = (fieldsByDept[dept] || []).filter(
-    (f) => f.value != null && f.value !== "" && f.value !== 0
-  );
+  const dept = report.department || "DEVELOPMENT";
+  const deptFields = FORM_FIELDS[dept] || FORM_FIELDS.DEVELOPMENT;
+
+  // Split into metric/number fields and text/narrative fields
+  const metricFields = [];
+  const textFields = [];
+  let blockersValue = report.blockers || report.data?.blockers || null;
+
+  deptFields.forEach((f) => {
+    const val = getFieldValue(report, f.key, f.column);
+    if (f.key === "blockers") {
+      if (val) blockersValue = val;
+      return;
+    }
+
+    if (val != null && val !== "") {
+      if (f.type === "textarea" || f.type === "text") {
+        textFields.push({ label: f.label, value: val });
+      } else if (f.type === "currency") {
+        metricFields.push({ label: f.label, value: formatUSD(val) });
+      } else {
+        metricFields.push({ label: f.label, value: Number(val).toLocaleString() });
+      }
+    }
+  });
 
   const isPending  = report.status === "SUBMITTED";
   const isApproved = report.status === "APPROVED";
@@ -150,7 +185,7 @@ export default function CeoReportDetailPage() {
           Back
         </button>
         <span style={{ color: "var(--color-text-muted)", fontSize: 14 }}>
-          / {report.department_title || dept}
+          / {report.department_title || report.head_title || dept}
           {report.report_date ? ` / ${format(new Date(report.report_date), "dd MMM yyyy")}` : ""}
         </span>
       </div>
@@ -164,7 +199,7 @@ export default function CeoReportDetailPage() {
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
               <div>
                 <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>
-                  {report.department_title || dept} — Daily Report
+                  {report.department_title || report.head_title || dept} — Daily Report
                 </h1>
                 <div style={{ fontSize: 14, color: "var(--color-text-muted)" }}>
                   {report.report_date ? format(new Date(report.report_date), "EEEE, dd MMMM yyyy") : "—"}
@@ -176,34 +211,42 @@ export default function CeoReportDetailPage() {
             <hr className="divider" />
 
             {/* Metrics grid */}
-            {fields.length > 0 && (
-              <div className="report-section">
-                <div className="report-section__title">Daily Metrics</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px 28px" }}>
-                  {fields.map((f) => (
-                    <div key={f.label} className="report-field">
-                      <div className="report-field__label">{f.label}</div>
-                      <div className="report-field__value">{f.value}</div>
+            {metricFields.length > 0 && (
+              <div className="report-section" style={{ marginBottom: 24 }}>
+                <div className="report-section__title" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 12 }}>
+                  Daily Metrics
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px 20px" }}>
+                  {metricFields.map((f) => (
+                    <div key={f.label} className="report-field" style={{ background: "var(--color-bg)", padding: "12px 16px", borderRadius: "var(--radius-sm)" }}>
+                      <div className="report-field__label" style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 4 }}>{f.label}</div>
+                      <div className="report-field__value" style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text)" }}>{f.value}</div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Summary */}
-            {report.summary && (
-              <div className="report-section">
-                <div className="report-section__title">Summary</div>
-                <div style={{ fontSize: 14, whiteSpace: "pre-wrap", lineHeight: 1.8 }}>{report.summary}</div>
+            {/* Text / narrative fields (Tasks completed, Tasks in progress, Plan for tomorrow, Notes) */}
+            {textFields.map((f) => (
+              <div key={f.label} className="report-section" style={{ marginBottom: 22 }}>
+                <div className="report-section__title" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 8 }}>
+                  {f.label}
+                </div>
+                <div style={{ fontSize: 14, whiteSpace: "pre-wrap", lineHeight: 1.7, background: "var(--color-bg)", padding: "14px 16px", borderRadius: "var(--radius-sm)", color: "var(--color-text)" }}>
+                  {f.value}
+                </div>
               </div>
-            )}
+            ))}
 
             {/* Blockers */}
-            {report.blockers && report.blockers.trim() && (
-              <div className="report-section">
-                <div className="report-section__title">Blockers</div>
-                <div className="blocker-card">
-                  <div className="blocker-card__text">{report.blockers}</div>
+            {blockersValue && blockersValue.trim() && (
+              <div className="report-section" style={{ marginBottom: 22 }}>
+                <div className="report-section__title" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-pending-text, #c27a13)", marginBottom: 8 }}>
+                  Blockers
+                </div>
+                <div className="blocker-card" style={{ padding: "14px 16px", borderRadius: "var(--radius-sm)", background: "var(--color-pending-bg, #fef3c7)", border: "1px solid #fde68a" }}>
+                  <div className="blocker-card__text" style={{ fontSize: 14, whiteSpace: "pre-wrap", lineHeight: 1.6, color: "var(--color-text)" }}>{blockersValue}</div>
                 </div>
               </div>
             )}
@@ -211,12 +254,14 @@ export default function CeoReportDetailPage() {
             {/* Attachments */}
             {report.attachments?.length > 0 && (
               <div className="report-section">
-                <div className="report-section__title">Attachments</div>
+                <div className="report-section__title" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 8 }}>
+                  Attachments
+                </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   {report.attachments.map((att) => (
-                    <a key={att.id} href={att.url || "#"} target="_blank" rel="noopener noreferrer"
+                    <a key={att.id || att.key} href={att.url || "#"} target="_blank" rel="noopener noreferrer"
                       className="btn btn--outline btn--sm">
-                      📎 {att.filename || att.id}
+                      📎 {att.filename || att.name || att.id}
                     </a>
                   ))}
                 </div>
@@ -234,7 +279,7 @@ export default function CeoReportDetailPage() {
 
             {/* Current status */}
             <div className="report-field" style={{ marginBottom: 16 }}>
-              <div className="report-field__label">Current Status</div>
+              <div className="report-field__label" style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 6 }}>Current Status</div>
               <StatusBadge status={report.status} />
             </div>
 
@@ -357,18 +402,18 @@ export default function CeoReportDetailPage() {
           <div className="card">
             <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Submission Info</h2>
             <div className="report-field">
-              <div className="report-field__label">Submitted By</div>
-              <div style={{ fontWeight: 600 }}>{report.head_title || "—"}</div>
+              <div className="report-field__label" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Submitted By</div>
+              <div style={{ fontWeight: 600 }}>{report.head_title || report.department_title || "—"}</div>
             </div>
-            <div className="report-field">
-              <div className="report-field__label">Submitted At</div>
+            <div className="report-field" style={{ marginTop: 10 }}>
+              <div className="report-field__label" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Submitted At</div>
               <div style={{ fontSize: 13 }}>
                 {report.created_at ? format(new Date(report.created_at), "dd MMM yyyy, HH:mm") : "—"}
               </div>
             </div>
             {report.reviewed_at && (
-              <div className="report-field">
-                <div className="report-field__label">Reviewed At</div>
+              <div className="report-field" style={{ marginTop: 10 }}>
+                <div className="report-field__label" style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Reviewed At</div>
                 <div style={{ fontSize: 13 }}>
                   {format(new Date(report.reviewed_at), "dd MMM yyyy, HH:mm")}
                 </div>

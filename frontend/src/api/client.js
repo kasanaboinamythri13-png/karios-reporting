@@ -28,7 +28,29 @@ export class ApiError extends Error {
 export async function api(path, { method = 'GET', body, headers = {} } = {}) {
   let res;
   try {
-    const token = getToken ? await getToken() : null;
+    let token = getToken ? await getToken() : null;
+    if (!token) {
+      try {
+        const { getAuth } = await import('firebase/auth');
+        const fbUser = getAuth().currentUser;
+        if (fbUser) token = await fbUser.getIdToken();
+      } catch {}
+    }
+    if (!token) {
+      try {
+        const s = sessionStorage.getItem('karios_mock_user');
+        if (s) {
+          const u = JSON.parse(s);
+          token = u.role === 'CEO' ? 'dev-ceo' : `dev-${(u.department || u.role || 'user').toLowerCase()}`;
+        }
+      } catch {}
+    }
+    if (!token) {
+      try {
+        token = localStorage.getItem('karios-dev-token');
+      } catch {}
+    }
+
     res = await fetch(`${API_URL}${path}`, {
       method,
       headers: {
