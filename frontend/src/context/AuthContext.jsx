@@ -39,7 +39,7 @@ function MockAuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ appUser, loading: false, login, logout, refreshUser: () => {} }}>
+    <AuthContext.Provider value={{ appUser, user: appUser, loading: false, login, logout, refreshUser: () => {} }}>
       {children}
     </AuthContext.Provider>
   );
@@ -86,7 +86,7 @@ function FirebaseAuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ appUser, loading: appUser === undefined, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ appUser, user: appUser, loading: appUser === undefined, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

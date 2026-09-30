@@ -24,8 +24,9 @@ export default function Sidebar({ role }) {
         { to: "/ceo/reports", label: "Reports",  icon: Icons.reports },
       ]
     : [
-        { to: "/head", label: "Home",    icon: Icons.home, end: true },
-        { to: "/head/reports", label: "Reports", icon: Icons.reports },
+        { to: "/head", label: "Home", icon: Icons.home, end: true },
+        { to: "/head/report", label: "Submit Report", icon: Icons.reports },
+        { to: "/head/history", label: "My Reports", icon: Icons.reports },
       ];
 
   const handleLogout = async () => {
