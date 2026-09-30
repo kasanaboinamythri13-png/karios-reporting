@@ -63,7 +63,7 @@ function Shell() {
         <div className="sidebar-footer">
           <span className="muted small">{user.title}</span>
           <button type="button" className="button-secondary logout" onClick={logout}>
-            Log out
+            Sign out
           </button>
         </div>
       </aside>

@@ -57,7 +57,7 @@ export default function ProfileMenu() {
           </dl>
           <div className="profile-panel-foot">
             <button type="button" className="button-secondary logout" onClick={logout}>
-              Log out
+              Sign out
             </button>
           </div>
         </div>

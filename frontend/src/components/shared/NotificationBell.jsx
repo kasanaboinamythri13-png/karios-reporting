@@ -58,7 +58,8 @@ export default function NotificationBell() {
   return (
     <div style={{ position: "relative" }} ref={ref}>
       <button
-        className="notif-btn"
+        type="button"
+        className={`notif-btn${open ? " active" : ""}`}
         id="notif-bell-btn"
         onClick={() => setOpen((o) => !o)}
         aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ""}`}

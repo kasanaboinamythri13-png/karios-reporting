@@ -121,7 +121,7 @@ export default function TopBar({ title, subtitle }) {
                 whiteSpace: "nowrap",
               }}
             >
-              {appUser?.title || appUser?.role || "User"}
+              {appUser?.role || "User"}
             </span>
             <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>
               {profileOpen ? "▲" : "▼"}
@@ -187,23 +187,9 @@ export default function TopBar({ title, subtitle }) {
                   {initial}
                 </div>
                 <div style={{ fontWeight: 800, fontSize: 18, color: "var(--color-text)", letterSpacing: "-0.3px" }}>
-                  {appUser?.title || appUser?.role}
+                  {appUser?.role || "User"}
                 </div>
-                <div
-                  style={{
-                    display: "inline-block",
-                    padding: "2px 10px",
-                    borderRadius: 12,
-                    background: "var(--color-primary-light)",
-                    color: "var(--color-primary)",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    marginTop: 4,
-                  }}
-                >
-                  {appUser?.role}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 6 }}>
+                <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>
                   {appUser?.email || `${(appUser?.role || "user").toLowerCase()}@karios.local`}
                 </div>
               </div>
@@ -211,7 +197,7 @@ export default function TopBar({ title, subtitle }) {
               {/* Divider */}
               <div style={{ height: 1, backgroundColor: "var(--color-border)", margin: "16px 0" }} />
 
-              {/* Details List (matching Image 2) */}
+              {/* Details List */}
               <div style={{ display: "flex", flexDirection: "column", gap: 12, textAlign: "left", fontSize: 13 }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", marginBottom: 2 }}>
@@ -219,15 +205,6 @@ export default function TopBar({ title, subtitle }) {
                   </div>
                   <div style={{ fontWeight: 600, color: "var(--color-text)" }}>
                     {appUser?.role}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", marginBottom: 2 }}>
-                    Title
-                  </div>
-                  <div style={{ fontWeight: 600, color: "var(--color-text)" }}>
-                    {appUser?.title}
                   </div>
                 </div>
 

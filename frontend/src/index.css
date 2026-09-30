@@ -61,13 +61,35 @@
 }
 
 /* Dark mode */
-[data-theme="dark"] {
-  --color-bg: #0f0f1a;
-  --color-surface: #1a1a2e;
-  --color-border: #2a2a4a;
-  --color-text: #f1f5f9;
-  --color-text-muted: #94a3b8;
+[data-theme="dark"],
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0d1117;
+  --color-surface: #161b22;
+  --color-card: #161b22;
+  --color-border: #30363d;
+  --color-text: #f0f6fc;
+  --color-text-muted: #8b949e;
   --color-primary-light: #2d1b69;
+  --color-approved-bg: rgba(5, 150, 105, 0.15);
+  --color-rejected-bg: rgba(220, 38, 38, 0.15);
+  --color-pending-bg: rgba(217, 119, 6, 0.15);
+  --color-missing-bg: rgba(156, 163, 175, 0.15);
+}
+
+/* Date input calendar picker indicator */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.95;
 }
 
 body {
@@ -186,6 +208,39 @@ body {
   gap: 8px;
   padding-top: 16px;
   border-top: 1px solid var(--color-border);
+}
+
+.sidebar__signout-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+}
+
+.sidebar__signout-btn:hover {
+  background: var(--color-rejected-bg);
+  color: var(--color-rejected);
+  border-color: rgba(220, 38, 38, 0.18);
+}
+
+.sidebar__signout-btn:focus-visible {
+  outline: 2px solid var(--color-rejected);
+  outline-offset: 1px;
+}
+
+.sidebar__signout-btn svg {
+  flex-shrink: 0;
+  stroke: currentColor;
 }
 
 /* ===================== Main Content ===================== */
@@ -354,34 +409,39 @@ body {
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .badge--approved {
   background: var(--color-approved-bg);
   color: var(--color-approved);
+  border: 1px solid rgba(5, 150, 105, 0.25);
 }
 
 .badge--rejected {
   background: var(--color-rejected-bg);
   color: var(--color-rejected);
+  border: 1px solid rgba(220, 38, 38, 0.25);
 }
 
 .badge--submitted,
 .badge--pending {
   background: var(--color-pending-bg);
   color: var(--color-pending);
+  border: 1px solid rgba(217, 119, 6, 0.25);
 }
 
 .badge--missing {
   background: var(--color-missing-bg);
   color: var(--color-missing);
+  border: 1px solid rgba(156, 163, 175, 0.25);
 }
 
 /* ===================== Buttons ===================== */
@@ -818,34 +878,55 @@ body {
 /* ===================== Notification Bell ===================== */
 .notif-btn {
   position: relative;
-  background: none;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   cursor: pointer;
-  padding: 8px;
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
   transition: var(--transition);
+  padding: 0;
+  outline: none;
 }
 
-.notif-btn:hover {
+.notif-btn:hover,
+.notif-btn.active {
   background: var(--color-primary-light);
   color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.notif-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.notif-btn svg {
+  stroke: currentColor;
+  display: block;
 }
 
 .notif-badge {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 16px;
-  height: 16px;
+  top: -2px;
+  right: -2px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
   background: var(--color-rejected);
-  border-radius: 50%;
+  border-radius: 999px;
   font-size: 10px;
   font-weight: 700;
-  color: white;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 2px solid var(--color-surface);
+  line-height: 1;
 }
 
 /* ===================== Theme Toggle ===================== */
