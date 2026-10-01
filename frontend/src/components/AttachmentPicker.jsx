@@ -66,7 +66,8 @@ export default function AttachmentPicker({ items, setItems, disabled }) {
               </span>
               <button
                 type="button"
-                className="link-button"
+                className="btn btn--ghost btn--sm"
+                style={{ color: "var(--color-rejected, #dc2626)", padding: "3px 8px", fontSize: 12 }}
                 disabled={disabled || it.status === 'uploading'}
                 onClick={() => setItems((list) => list.filter((x) => x.key !== it.key))}
               >
@@ -80,7 +81,8 @@ export default function AttachmentPicker({ items, setItems, disabled }) {
       <input ref={inputRef} type="file" accept={ACCEPT} multiple hidden onChange={onPick} />
       <button
         type="button"
-        className="button-secondary"
+        className="btn btn--outline btn--sm"
+        style={{ marginTop: 8 }}
         disabled={disabled || slotsLeft <= 0}
         onClick={() => inputRef.current?.click()}
       >

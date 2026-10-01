@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import { departmentLabel } from "../../auth/roles";
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_AUTH === "true";
 
@@ -94,7 +95,7 @@ export default function CeoOverviewPage() {
             Home / Overview
           </h1>
           <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-            {todayStr} &nbsp;·&nbsp; Asia/Kolkata timezone
+            {todayStr}
           </p>
         </div>
 
@@ -186,7 +187,7 @@ export default function CeoOverviewPage() {
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                     <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text)" }}>
-                      {dept.title.replace(" Head", "")}
+                      {departmentLabel(dept.department)}
                     </div>
                   </div>
 

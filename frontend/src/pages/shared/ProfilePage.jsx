@@ -7,7 +7,7 @@ export default function ProfilePage() {
 
   return (
     <>
-      <h1 className="page-title">Home / Profile</h1>
+      <h1 className="page-title">Profile</h1>
       <div className="card profile">
         <dl className="report-fields">
           <div className="report-field">
@@ -25,7 +25,7 @@ export default function ProfilePage() {
             </div>
           )}
         </dl>
-        <button type="button" className="button-secondary" onClick={logout}>
+        <button type="button" className="btn btn--danger btn--sm" onClick={logout}>
           Sign out
         </button>
       </div>

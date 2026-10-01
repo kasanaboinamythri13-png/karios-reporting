@@ -49,9 +49,9 @@ export default function NotificationsPage() {
   return (
     <>
       <div className="page-head">
-        <h1 className="page-title">Home / Notifications</h1>
+        <h1 className="page-title">Notifications</h1>
         {unread > 0 && (
-          <button type="button" className="button-secondary" disabled={busy} onClick={markAll}>
+          <button type="button" className="btn btn--outline btn--sm" disabled={busy} onClick={markAll}>
             Mark all as read
           </button>
         )}
