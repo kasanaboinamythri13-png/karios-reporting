@@ -106,7 +106,7 @@ Another head's report → `404`.
    Uploads not added to a report within 24 hours are deleted.
 
 Rules: JPG / PNG / PDF only, extension must match the type, the content must really be that type,
-≤ 5 MB (`413` if bigger), ≤ 5 per report.
+≤ 4 MB (`413` if bigger), ≤ 5 per report.
 `GET /attachments/:id/file` → the file (`Content-Type` = its type). The report's head and the CEO only;
 anyone else → `404`.
 

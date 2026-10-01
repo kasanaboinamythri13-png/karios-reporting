@@ -27,8 +27,8 @@ test('extension must match the type', () => {
   rejects({ fileName: 'virus.exe', mimeType: 'application/pdf', sizeBytes: 100 }, /does not match/);
 });
 
-test('files over 5 MB or empty are rejected', () => {
-  rejects({ fileName: 'big.pdf', mimeType: 'application/pdf', sizeBytes: MAX_FILE_BYTES + 1 }, /larger than 5 MB/);
+test('files over 4 MB or empty are rejected', () => {
+  rejects({ fileName: 'big.pdf', mimeType: 'application/pdf', sizeBytes: MAX_FILE_BYTES + 1 }, /larger than 4 MB/);
   rejects({ fileName: 'empty.pdf', mimeType: 'application/pdf', sizeBytes: 0 }, /empty/);
 });
 

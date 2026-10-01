@@ -19,19 +19,32 @@ export async function authenticate(req, res, next) {
     return next(Unauthorized('Missing token'));
   }
 
-  // 1. Dev / Mock Token Bypass (Convenient for local development, tests, and Postman)
-  if (token.startsWith('dev-') || token.startsWith('mock-') || token.toLowerCase().includes('ceo')) {
-    const lower = token.toLowerCase();
-    
-    let roleQuery = "role = 'CEO'";
-    if (lower.includes('ceo')) roleQuery = "role = 'CEO'";
-    else if (lower.includes('dev')) roleQuery = "role = 'DEVELOPER_HEAD'";
-    else if (lower.includes('sale')) roleQuery = "role = 'SALES_HEAD'";
-    else if (lower.includes('market') || lower.includes('mktg')) roleQuery = "role = 'MARKETING_HEAD'";
-    else if (lower.includes('finan') || lower.includes('fin')) roleQuery = "role = 'FINANCE_HEAD'";
+  // 1. Test logins ("Bearer dev-sales") for local development, tests and Postman.
+  //    Refused unless ALLOW_DEV_TOKENS=true — which must never be set on the live server.
+  const lower = token.toLowerCase();
+  if (lower.startsWith('dev-') || lower.startsWith('mock-')) {
+    if (!env.allowDevTokens) {
+      return next(Unauthorized('Test logins are turned off on this server'));
+    }
+
+    // Look only at the part after "dev-" / "mock-", so "dev-sales" is the Sales Head
+    // (not the Developer Head just because the token starts with "dev").
+    const who = lower.replace(/^(dev|mock)-/, '');
+    let role = null;
+    if (who.includes('ceo')) role = 'CEO';
+    else if (who.includes('sale')) role = 'SALES_HEAD';
+    else if (who.includes('market') || who.includes('mktg')) role = 'MARKETING_HEAD';
+    else if (who.includes('fin')) role = 'FINANCE_HEAD';
+    else if (who.includes('dev')) role = 'DEVELOPER_HEAD';
+    if (!role) {
+      return next(Unauthorized(`Unknown test login '${token}'. Use dev-ceo, dev-development, dev-sales, dev-marketing or dev-finance.`));
+    }
 
     try {
-      const result = await query(`SELECT id, email, role, department, title, is_active FROM users WHERE ${roleQuery} LIMIT 1;`);
+      const result = await query(
+        'SELECT id, email, role, department, title, is_active FROM users WHERE role = $1 LIMIT 1;',
+        [role],
+      );
       if (result.rows.length === 0) {
         return next(Unauthorized(`Dev user for token '${token}' not found in database. Run migrations first.`));
       }

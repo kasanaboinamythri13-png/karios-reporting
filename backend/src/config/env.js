@@ -10,6 +10,8 @@ export const env = {
   allowDevTokens: process.env.ALLOW_DEV_TOKENS === 'true',
   // When the daily reminder runs (cron format, IST). Default: every day at 18:00.
   reminderCron: process.env.REMINDER_CRON || '0 18 * * *',
+  // Secret Vercel Cron sends to /api/cron/* (live server only). Without it those endpoints refuse everyone.
+  cronSecret: process.env.CRON_SECRET,
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,

@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { ACCEPT, MAX_FILES_PER_REPORT, MAX_FILE_LABEL, checkFile, uploadFile } from '../api/attachments.js';
 import { formatFileSize } from '../utils/files.js';
 
-// Lets a head add up to 5 files (JPG / PNG / PDF, 5 MB each) to a report.
+// Lets a head add up to 5 files (JPG / PNG / PDF, 4 MB each) to a report.
 // items: [{ key, id?, fileName, sizeBytes, status: 'uploading' | 'done' | 'error', progress, error }]
 // Each new file is uploaded to the backend straight away.
 export default function AttachmentPicker({ items, setItems, disabled }) {

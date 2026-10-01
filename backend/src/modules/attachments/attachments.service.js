@@ -17,7 +17,7 @@ export const ALLOWED_TYPES = {
   'image/png': ['.png'],
   'application/pdf': ['.pdf'],
 };
-export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB — files live in the database, so keep them small
+export const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4 MB — files live in the database, and Vercel refuses requests over 4.5 MB
 export const MAX_FILES_PER_REPORT = 5;
 
 // Uploads never attached to a report (form abandoned, file removed) are deleted after this long.
@@ -37,7 +37,7 @@ const uploadRequestSchema = z.object({
     .number({ error: 'sizeBytes must be a number' })
     .int()
     .min(1, 'File is empty')
-    .max(MAX_FILE_BYTES, 'File is larger than 5 MB'),
+    .max(MAX_FILE_BYTES, 'File is larger than 4 MB'),
 });
 
 /**
