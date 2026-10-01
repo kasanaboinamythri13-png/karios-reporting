@@ -11,9 +11,9 @@ export function errorHandler(err, req, res, next) {
     return res.status(err.statusCode).json({ error: { code: err.code, message: err.message } });
   }
 
-  // Body too big (e.g. an attachment over 5 MB) or unreadable body — the client's fault, not a crash.
+  // Body too big (e.g. an attachment over 4 MB) or unreadable body — the client's fault, not a crash.
   if (err.type === 'entity.too.large') {
-    return res.status(413).json({ error: { code: 'TOO_LARGE', message: 'File is larger than 5 MB' } });
+    return res.status(413).json({ error: { code: 'TOO_LARGE', message: 'File is larger than 4 MB' } });
   }
   if (err.expose && err.status >= 400 && err.status < 500) {
     return res.status(err.status).json({ error: { code: 'BAD_REQUEST', message: err.message } });

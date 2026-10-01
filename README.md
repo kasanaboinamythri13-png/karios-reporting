@@ -84,7 +84,7 @@ FIREBASE_PRIVATE_KEY="..."
 Files are stored **in the database** (`attachments.content`) — no Firebase Storage, no card, nothing to configure.
 Everyone shares the same Neon database, so once `DATABASE_URL` is in `backend/.env`, uploads work locally.
 
-Rules: JPG / PNG / PDF, max 5 MB each, max 5 per report. Uploads not added to a report within 24 hours are deleted.
+Rules: JPG / PNG / PDF, max 4 MB each, max 5 per report. Uploads not added to a report within 24 hours are deleted.
 
 **New database only** (already done on the shared one): `cd backend && npm run db:attachments`
 — adds the attachment columns. Safe to run again; it changes nothing else.

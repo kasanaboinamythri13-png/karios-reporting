@@ -10,6 +10,7 @@ import reportRoutes from './modules/reports/reports.routes.js';
 import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
 import attachmentRoutes from './modules/attachments/attachments.routes.js';
 import notificationRoutes from './modules/notifications/notifications.routes.js';
+import cronRoutes from './modules/cron/cron.routes.js';
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/cron', cronRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

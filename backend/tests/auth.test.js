@@ -23,6 +23,23 @@ test('dev tokens are refused unless ALLOW_DEV_TOKENS=true', async () => {
   }
 });
 
+test('a real (non-test) token that happens to contain "ceo" is not treated as the CEO', async () => {
+  const res = await request(app).get('/api/reports/today').set('Authorization', 'Bearer eyJceo.fake.token');
+  assert.equal(res.status, 401);
+});
+
+test('cron endpoints refuse requests without the CRON_SECRET', async () => {
+  const original = env.cronSecret;
+  env.cronSecret = 'test-secret';
+  try {
+    assert.equal((await request(app).get('/api/cron/daily-reminder')).status, 401);
+    const wrong = await request(app).get('/api/cron/daily-reminder').set('Authorization', 'Bearer nope');
+    assert.equal(wrong.status, 401);
+  } finally {
+    env.cronSecret = original;
+  }
+});
+
 test('all four head roles pass requireRole("HEAD")', () => {
   for (const role of ['DEVELOPER_HEAD', 'SALES_HEAD', 'MARKETING_HEAD', 'FINANCE_HEAD']) {
     assert.equal(roleCheck(['HEAD'], role), undefined, role);

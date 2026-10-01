@@ -4,7 +4,7 @@ import { requireRole } from '../../middleware/requireRole.js';
 import * as attachmentsService from './attachments.service.js';
 
 // Owner: Member 2
-// Rules: JPG / PNG / PDF only, max 5 MB each, max 5 per report.
+// Rules: JPG / PNG / PDF only, max 4 MB each, max 5 per report.
 // Files are stored in the database and only sent to the report's owner or the CEO.
 const router = Router();
 

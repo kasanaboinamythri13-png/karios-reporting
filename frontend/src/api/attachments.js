@@ -6,8 +6,8 @@ export const ALLOWED_TYPES = {
   'image/png': ['.png'],
   'application/pdf': ['.pdf'],
 };
-export const MAX_FILE_BYTES = 5 * 1024 * 1024;
-export const MAX_FILE_LABEL = '5 MB';
+export const MAX_FILE_BYTES = 4 * 1024 * 1024;
+export const MAX_FILE_LABEL = '4 MB';
 export const MAX_FILES_PER_REPORT = 5;
 export const ACCEPT = Object.values(ALLOWED_TYPES).flat().join(',');
 
