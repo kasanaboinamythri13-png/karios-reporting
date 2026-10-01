@@ -1,6 +1,6 @@
-// src/components/ceo/DepartmentStatusCard.jsx
 import React from "react";
 import StatusBadge from "../shared/StatusBadge";
+import { departmentLabel } from "../../auth/roles";
 
 const DEPT_ICONS = {
   DEVELOPMENT: "💻",
@@ -21,7 +21,7 @@ export default function DepartmentStatusCard({ dept, onClick }) {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <span style={{ fontSize: 20 }}>{DEPT_ICONS[dept.department] || "📋"}</span>
-        <span className="dept-card__name">{dept.title.replace(" Head", "")}</span>
+        <span className="dept-card__name">{departmentLabel(dept.department)}</span>
       </div>
       <StatusBadge status={dept.status === "MISSING" ? "MISSING" : dept.status} />
     </div>

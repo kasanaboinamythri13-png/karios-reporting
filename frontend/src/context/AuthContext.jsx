@@ -38,8 +38,18 @@ function MockAuthProvider({ children }) {
     setAppUser(null);
   };
 
+  const resetPassword = async (email) => {
+    const record = MOCK_USERS[email?.trim().toLowerCase()];
+    if (!record) {
+      const err = new Error("No account found with this email.");
+      err.code = "auth/user-not-found";
+      throw err;
+    }
+    return true;
+  };
+
   return (
-    <AuthContext.Provider value={{ appUser, user: appUser, loading: false, login, logout, refreshUser: () => {} }}>
+    <AuthContext.Provider value={{ appUser, user: appUser, loading: false, login, logout, resetPassword, refreshUser: () => {} }}>
       {children}
     </AuthContext.Provider>
   );
@@ -76,6 +86,12 @@ function FirebaseAuthProvider({ children }) {
     return signOut(auth);
   };
 
+  const resetPassword = async (email) => {
+    const { sendPasswordResetEmail } = await import("firebase/auth");
+    const { auth } = await import("../services/firebase");
+    return sendPasswordResetEmail(auth, email.trim());
+  };
+
   const refreshUser = async () => {
     const api = (await import("../services/api")).default;
     const { getAuth } = await import("firebase/auth");
@@ -86,7 +102,7 @@ function FirebaseAuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ appUser, user: appUser, loading: appUser === undefined, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ appUser, user: appUser, loading: appUser === undefined, login, logout, resetPassword, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

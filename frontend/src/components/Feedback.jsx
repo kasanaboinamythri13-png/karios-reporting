@@ -16,7 +16,7 @@ export function ErrorBanner({ error, onRetry }) {
     <div className="alert alert-error" role="alert">
       <span>{message}</span>
       {onRetry && (
-        <button type="button" className="button-secondary button-small" onClick={() => onRetry()}>
+        <button type="button" className="btn btn--outline btn--sm" onClick={() => onRetry()}>
           Retry
         </button>
       )}

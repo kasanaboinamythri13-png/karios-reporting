@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import api from "../../services/api";
 import { useToast } from "../../context/ToastContext";
+import { departmentLabel } from "../../auth/roles";
 
 export default function ReviewModal({ report, onClose, onReviewed }) {
   const [status,  setStatus]  = useState("");
@@ -11,13 +12,24 @@ export default function ReviewModal({ report, onClose, onReviewed }) {
 
   const handleSubmit = async () => {
     if (!status) { toast.error("Select decision", "Choose Approve or Reject."); return; }
+    if (status === "REJECTED" && !comment.trim()) {
+      toast.error("Comment required", "Please enter a comment explaining why the report was rejected.");
+      return;
+    }
     setLoading(true);
     try {
       await api.post(`/reports/${report.id}/review`, { status, comment: comment.trim() || null });
-      toast.success(
-        status === "APPROVED" ? "Report Approved" : "Report Rejected",
-        `The ${report.department?.toLowerCase()} report has been ${status.toLowerCase()}.`
-      );
+      if (status === "REJECTED") {
+        toast.error(
+          "Report Rejected",
+          `The ${report.department?.toLowerCase()} report has been rejected.`
+        );
+      } else {
+        toast.success(
+          "Report Approved",
+          `The ${report.department?.toLowerCase()} report has been approved.`
+        );
+      }
       onReviewed();
       onClose();
     } catch (err) {
@@ -46,7 +58,7 @@ export default function ReviewModal({ report, onClose, onReviewed }) {
           {/* Department info */}
           <div style={{ background: "var(--color-bg)", borderRadius: "var(--radius-sm)", padding: "14px 16px", marginBottom: 20 }}>
             <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 4 }}>Department</div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>{report.department_title || report.department}</div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>{departmentLabel(report.department)}</div>
             <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 6 }}>
               {new Date(report.report_date || report.created_at).toLocaleDateString("en-IN", { dateStyle: "medium" })}
             </div>
@@ -78,13 +90,13 @@ export default function ReviewModal({ report, onClose, onReviewed }) {
           {/* Comment */}
           <div className="form-group">
             <label className="form-label" htmlFor="review-comment">
-              Comment (optional)
+              Comment
             </label>
             <textarea
               id="review-comment"
               className="form-textarea"
               rows={4}
-              placeholder="Add an optional comment…"
+              placeholder="Add a comment…"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
             />

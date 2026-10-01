@@ -10,6 +10,7 @@ import StatusBadge from '../../components/StatusBadge.jsx';
 import { ErrorBanner, Loading } from '../../components/Feedback.jsx';
 import { buildReportData, toFormValues } from '../../utils/reportForm.js';
 import { formatLongDate } from '../../utils/date.js';
+import { useToast } from '../../context/ToastContext.jsx';
 
 // Owner: Member 2
 // One page for both: no report today → Submit (POST). Report today → Edit (PATCH, same day only).
@@ -27,7 +28,7 @@ export default function ReportFormPage() {
   if (error) {
     return (
       <>
-        <h1 className="page-title">Home / Daily report</h1>
+        <h1 className="page-title">Daily Report</h1>
         <ErrorBanner error={error} onRetry={reload} />
       </>
     );
@@ -55,6 +56,7 @@ function ReportForm({ fields, today, notice, onConflict }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
   const report = today.report;
   const isEdit = Boolean(report);
 
@@ -111,18 +113,21 @@ function ReportForm({ fields, today, notice, onConflict }) {
       if (isEdit) await updateReport(report.id, body);
       else await submitReport(body);
       setDirty(false);
-      const flash = isEdit
+      const title = isEdit ? "Report Updated" : "Report Submitted";
+      const msg = isEdit
         ? report.status === 'REJECTED'
           ? 'Report corrected and sent back to the CEO for review.'
-          : 'Report updated.'
-        : 'Report submitted. The CEO has been notified.';
-      navigate('/head', { state: { flash } });
+          : 'Your daily report has been updated.'
+        : 'Your daily report has been submitted. The CEO has been notified.';
+      toast.success(title, msg);
+      navigate('/head');
     } catch (err) {
       if (err.status === 409) {
         // Already submitted today (e.g. from another tab) → reload in edit mode.
         onConflict();
       } else {
         setServerError(err.message);
+        toast.error("Submission failed", err.message || "Please check your inputs and try again.");
       }
     } finally {
       setSaving(false);
@@ -131,12 +136,7 @@ function ReportForm({ fields, today, notice, onConflict }) {
 
   return (
     <>
-      <div className="page-head">
-        <h1 className="page-title">Home / {isEdit ? 'Edit report' : 'Submit report'}</h1>
-        <button type="button" className="link-button" onClick={() => leave()}>
-          ← Back
-        </button>
-      </div>
+      <h1 className="page-title">{isEdit ? 'Edit Report' : 'Submit Report'}</h1>
 
       <form className="card report-form" onSubmit={onSubmit} noValidate>
         <div className="card-head">
@@ -181,11 +181,11 @@ function ReportForm({ fields, today, notice, onConflict }) {
           disabled={saving}
         />
 
-        <div className="actions form-actions">
-          <button type="button" className="button-secondary" disabled={saving} onClick={() => leave('/head')}>
+        <div className="actions form-actions" style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
+          <button type="button" className="btn btn--outline" disabled={saving} onClick={() => leave('/head')}>
             Cancel
           </button>
-          <button type="submit" disabled={saving || uploading}>
+          <button type="submit" className="btn btn--primary" disabled={saving || uploading}>
             {saving ? 'Saving…' : uploading ? 'Uploading files…' : isEdit ? 'Save changes' : 'Submit report'}
           </button>
         </div>

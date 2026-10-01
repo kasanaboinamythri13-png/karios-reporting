@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import StatusBadge from "../../components/shared/StatusBadge";
 import { format } from "date-fns";
+import { departmentLabel } from "../../auth/roles";
 
 const DEPARTMENTS = [
   { value: "",            label: "All Departments" },
@@ -28,6 +29,7 @@ export default function CeoReportsPage() {
   const [department,   setDepartment]   = useState("");
   const [dateFrom,     setDateFrom]     = useState("");
   const [dateTo,       setDateTo]       = useState("");
+  const [page,         setPage]         = useState(1);
 
   const navigate = useNavigate();
 
@@ -83,6 +85,18 @@ export default function CeoReportsPage() {
     });
   }, [reports, activeTab, searchQuery]);
 
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, searchQuery, department, dateFrom, dateTo]);
+
+  const PAGE_SIZE = 10;
+  const totalPages = Math.ceil(filteredReports.length / PAGE_SIZE) || 1;
+  const paginatedReports = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredReports.slice(start, start + PAGE_SIZE);
+  }, [filteredReports, page]);
+
   const hasActiveFilters = department || dateFrom || dateTo || searchQuery || activeTab !== "ALL";
 
   const clearAllFilters = () => {
@@ -91,6 +105,7 @@ export default function CeoReportsPage() {
     setDepartment("");
     setDateFrom("");
     setDateTo("");
+    setPage(1);
   };
 
   return (
@@ -309,7 +324,7 @@ export default function CeoReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredReports.map((r) => {
+                {paginatedReports.map((r) => {
                   const deptStyle = DEPT_BADGE_STYLE[r.department] || {
                     bg: "#f3f4f6", color: "#374151", border: "#e5e7eb",
                   };
@@ -346,7 +361,7 @@ export default function CeoReportsPage() {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {r.department_title || r.department}
+                          {departmentLabel(r.department)}
                         </span>
                       </td>
 
@@ -401,6 +416,43 @@ export default function CeoReportsPage() {
                 })}
               </tbody>
             </table>
+
+            {/* Pagination Controls (same format as department heads) */}
+            <div
+              className="pagination"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "14px 20px",
+                borderTop: "1px solid var(--color-border)",
+                background: "var(--color-surface)",
+              }}
+            >
+              <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                Page {page} of {totalPages} · {filteredReports.length} reports
+              </span>
+              <div className="actions" style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn--outline btn--sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  id="ceo-pagination-prev"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--outline btn--sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  id="ceo-pagination-next"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
