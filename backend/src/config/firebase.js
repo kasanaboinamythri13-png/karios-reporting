@@ -24,10 +24,13 @@ try {
     bucket = env.firebase.storageBucket ? getStorage(app).bucket() : null;
     console.log('[Firebase] Admin SDK initialized with service account.');
   } else {
-    console.log('[Firebase] Running in DEV mode (no service account). Dev bypass tokens enabled.');
+    const missing = ['FIREBASE_PROJECT_ID', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY'].filter(
+      (name) => !process.env[name],
+    );
+    console.error(`[Firebase] NOT configured — real logins will fail. Missing: ${missing.join(', ')}`);
   }
 } catch (err) {
-  console.warn('[Firebase] Initialization warning:', err.message);
+  console.error('[Firebase] NOT configured — real logins will fail. The key could not be read:', err.message);
 }
 
 export { app, auth, bucket };
