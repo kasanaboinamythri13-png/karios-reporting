@@ -7,6 +7,7 @@ import AttachmentList from "../../components/AttachmentList";
 import { useToast } from "../../context/ToastContext";
 import { format } from "date-fns";
 import { formatUSD } from "../../utils/currency";
+import { departmentLabel } from "../../auth/roles";
 
 const FORM_FIELDS = {
   DEVELOPMENT: [
@@ -89,13 +90,24 @@ export default function CeoReportDetailPage() {
 
   // ── Inline review handler ────────────────────────────────────────────────
   const handleReview = async (status) => {
+    if (status === "REJECTED" && !comment.trim()) {
+      toast.error("Comment required", "Please enter a comment explaining why the report was rejected.");
+      return;
+    }
     setSubmitting(true);
     try {
       await api.post(`/reports/${id}/review`, { status, comment: comment.trim() || null });
-      toast.success(
-        status === "APPROVED" ? "Report Approved ✅" : "Report Rejected",
-        `The ${report?.department?.toLowerCase()} report has been ${status.toLowerCase()}.`
-      );
+      if (status === "REJECTED") {
+        toast.error(
+          "Report Rejected",
+          `The ${report?.department?.toLowerCase()} report has been rejected.`
+        );
+      } else {
+        toast.success(
+          "Report Approved ✅",
+          `The ${report?.department?.toLowerCase()} report has been approved.`
+        );
+      }
       setComment("");
       await fetchReport();
     } catch (err) {
@@ -186,7 +198,7 @@ export default function CeoReportDetailPage() {
           Back
         </button>
         <span style={{ color: "var(--color-text-muted)", fontSize: 14 }}>
-          / {report.department_title || report.head_title || dept}
+          / {departmentLabel(report.department)}
           {report.report_date ? ` / ${format(new Date(report.report_date), "dd MMM yyyy")}` : ""}
         </span>
       </div>
@@ -200,7 +212,7 @@ export default function CeoReportDetailPage() {
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
               <div>
                 <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>
-                  {report.department_title || report.head_title || dept} — Daily Report
+                  {departmentLabel(report.department)} — Daily Report
                 </h1>
                 <div style={{ fontSize: 14, color: "var(--color-text-muted)" }}>
                   {report.report_date ? format(new Date(report.report_date), "EEEE, dd MMMM yyyy") : "—"}
@@ -287,18 +299,14 @@ export default function CeoReportDetailPage() {
                   <label
                     className="form-label"
                     htmlFor="review-comment-box"
-                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
                   >
-                    <span>CEO Comment</span>
-                    <span style={{ fontSize: 11, fontWeight: 400, color: "var(--color-text-muted)" }}>
-                      (optional)
-                    </span>
+                    CEO Comment
                   </label>
                   <textarea
                     id="review-comment-box"
                     className="form-textarea"
                     rows={4}
-                    placeholder="Add an optional comment for the department head…"
+                    placeholder="Add a comment for the department head…"
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     style={{ resize: "vertical", minHeight: 96 }}
@@ -351,7 +359,7 @@ export default function CeoReportDetailPage() {
                   <span style={{ fontWeight: 700, color: "#065f46", fontSize: 14 }}>Approved</span>
                 </div>
                 {report.review_comment && (
-                  <div style={{ fontSize: 13, color: "#065f46", fontStyle: "italic" }}>
+                  <div style={{ fontSize: 13, color: "#065f46" }}>
                     "{report.review_comment}"
                   </div>
                 )}
@@ -379,7 +387,7 @@ export default function CeoReportDetailPage() {
                   <span style={{ fontWeight: 700, color: "#b91c1c", fontSize: 14 }}>Rejected</span>
                 </div>
                 {report.review_comment && (
-                  <div style={{ fontSize: 13, color: "#7f1d1d", fontStyle: "italic" }}>
+                  <div style={{ fontSize: 13, color: "#7f1d1d" }}>
                     "{report.review_comment}"
                   </div>
                 )}

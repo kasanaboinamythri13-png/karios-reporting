@@ -34,11 +34,43 @@ export default function ReportDetailPage() {
 
   return (
     <>
-      <div className="page-head">
-        <h1 className="page-title">Home / Report</h1>
-        <button type="button" className="link-button" onClick={() => navigate(-1)}>
-          ← Back
+      {/* ── Breadcrumb ── */}
+      <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() => navigate(-1)}
+          id="back-btn"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontWeight: 600,
+            padding: "6px 12px",
+            borderRadius: "var(--radius-sm)",
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
+          Back
         </button>
+        {data?.report && (
+          <span style={{ color: "var(--color-text-muted)", fontSize: 14 }}>
+            / {data.report.head_title || departmentLabel(data.report.department)}
+            {data.report.report_date ? ` / ${formatLongDate(data.report.report_date)}` : ""}
+          </span>
+        )}
       </div>
 
       <ErrorBanner error={error} onRetry={error?.status === 404 ? undefined : reload} />
@@ -64,8 +96,8 @@ export default function ReportDetailPage() {
             <ReportFields fields={data.fields} data={data.report.data} />
 
             {data.canEdit && (
-              <div className="actions">
-                <Link className="button" to="/head/report">
+              <div className="actions" style={{ marginTop: 20 }}>
+                <Link className="btn btn--primary" to="/head/report">
                   {data.report.status === 'REJECTED' ? 'Fix & resubmit' : 'Edit report'}
                 </Link>
               </div>

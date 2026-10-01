@@ -370,6 +370,9 @@ export function mockUpdateReport(id, currentUser, body) {
 // POST /api/reports/:id/review  { status, comment }
 export function mockReviewReport(id, ceoUser, { status, comment }) {
   if (!["APPROVED", "REJECTED"].includes(status)) throw { status: 400, message: "Invalid status." };
+  if (status === "REJECTED" && (!comment || comment.trim().length === 0)) {
+    throw { status: 400, message: "A comment is required when rejecting a report." };
+  }
 
   const idx = STORE.reports.findIndex((r) => r.id === id);
   if (idx < 0) throw { status: 404, message: "Report not found." };

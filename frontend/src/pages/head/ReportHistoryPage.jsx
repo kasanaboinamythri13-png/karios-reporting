@@ -47,7 +47,7 @@ export default function ReportHistoryPage() {
 
   return (
     <>
-      <h1 className="page-title">Home / My reports</h1>
+      <h1 className="page-title">My Reports</h1>
 
       <div className="card filters">
         <label className="field">
@@ -127,13 +127,13 @@ export default function ReportHistoryPage() {
             <span className="muted small">
               Page {data.pagination.page} of {data.pagination.totalPages} · {data.pagination.total} reports
             </span>
-            <div className="actions">
-              <button type="button" className="button-secondary" disabled={page <= 1} onClick={() => goToPage(page - 1)}>
+            <div className="actions" style={{ display: "flex", gap: 8 }}>
+              <button type="button" className="btn btn--outline btn--sm" disabled={page <= 1} onClick={() => goToPage(page - 1)}>
                 Previous
               </button>
               <button
                 type="button"
-                className="button-secondary"
+                className="btn btn--outline btn--sm"
                 disabled={page >= data.pagination.totalPages}
                 onClick={() => goToPage(page + 1)}
               >
