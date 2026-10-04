@@ -2,11 +2,11 @@
 import React, { createContext, useState, useEffect } from "react";
 
 const MOCK_USERS = {
-  "ceo@karios.local":       { password: "Password123!", user: { id: "mock-ceo-id",   role: "CEO",            department: null,          title: "CEO" } },
-  "dev@karios.local":       { password: "Password123!", user: { id: "mock-dev-id",   role: "DEVELOPER_HEAD", department: "DEVELOPMENT", title: "Developer Head" } },
-  "sales@karios.local":     { password: "Password123!", user: { id: "mock-sales-id", role: "SALES_HEAD",     department: "SALES",       title: "Sales Head" } },
-  "marketing@karios.local": { password: "Password123!", user: { id: "mock-mktg-id",  role: "MARKETING_HEAD", department: "MARKETING",   title: "Marketing Head" } },
-  "finance@karios.local":   { password: "Password123!", user: { id: "mock-fin-id",   role: "FINANCE_HEAD",   department: "FINANCE",     title: "Finance Head" } },
+  "ceo@karios.local":       { id: "mock-ceo-id",   role: "CEO",            department: null,          title: "CEO" },
+  "dev@karios.local":       { id: "mock-dev-id",   role: "DEVELOPER_HEAD", department: "DEVELOPMENT", title: "Developer Head" },
+  "sales@karios.local":     { id: "mock-sales-id", role: "SALES_HEAD",     department: "SALES",       title: "Sales Head" },
+  "marketing@karios.local": { id: "mock-mktg-id",  role: "MARKETING_HEAD", department: "MARKETING",   title: "Marketing Head" },
+  "finance@karios.local":   { id: "mock-fin-id",   role: "FINANCE_HEAD",   department: "FINANCE",     title: "Finance Head" },
 };
 
 const USE_MOCK    = import.meta.env.VITE_USE_MOCK_AUTH === "true";
@@ -23,14 +23,14 @@ function MockAuthProvider({ children }) {
   });
 
   const login = async (email, password) => {
-    const record = MOCK_USERS[email.trim().toLowerCase()];
-    if (!record || record.password !== password) {
+    const user = MOCK_USERS[email.trim().toLowerCase()];
+    if (!user || !password) {
       const err = new Error("Invalid email or password.");
       err.code = "auth/wrong-password";
       throw err;
     }
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(record.user));
-    setAppUser(record.user);
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    setAppUser(user);
   };
 
   const logout = async () => {
