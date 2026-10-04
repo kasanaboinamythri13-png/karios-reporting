@@ -5,17 +5,6 @@ import { useAuth } from "../context/useAuth";
 import { useToast } from "../context/ToastContext";
 import KariosLogo from "../components/shared/KariosLogo";
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_AUTH === "true";
-
-// Quick-fill buttons for dev convenience
-const DEV_ACCOUNTS = [
-  { label: "CEO",       email: "ceo@karios.local" },
-  { label: "Developer", email: "dev@karios.local" },
-  { label: "Sales",     email: "sales@karios.local" },
-  { label: "Marketing", email: "marketing@karios.local" },
-  { label: "Finance",   email: "finance@karios.local" },
-];
-
 const iconProps = {
   width: 17, height: 17, viewBox: "0 0 24 24", fill: "none",
   stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
@@ -149,11 +138,6 @@ export default function LoginPage() {
     setResetEmail(email);
     setResetSuccess(false);
     setIsForgot(true);
-  };
-
-  const fillAccount = (acc) => {
-    setEmail(acc.email);
-    setPassword("Password123!");
   };
 
   return (

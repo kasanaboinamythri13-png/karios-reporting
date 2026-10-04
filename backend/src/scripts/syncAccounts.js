@@ -1,14 +1,22 @@
 import { auth } from '../config/firebase.js';
 import { query } from '../config/db.js';
 
-const accounts = [
-  { email: 'developer.head@karios.com', password: 'Developer@123', role: 'DEVELOPER_HEAD', department: 'DEVELOPMENT', title: 'Developer Head' },
-  { email: 'sales.head@karios.com',     password: 'Sales@123',     role: 'SALES_HEAD',     department: 'SALES',       title: 'Sales Head' },
-  { email: 'marketing.head@karios.com', password: 'Marketing@123', role: 'MARKETING_HEAD', department: 'MARKETING',   title: 'Marketing Head' },
-  { email: 'finance.head@karios.com',   password: 'Finance@123',   role: 'FINANCE_HEAD',   department: 'FINANCE',     title: 'Finance Head' },
-];
+/**
+ * Account sync utility.
+ * Pass accounts dynamically via ACCOUNTS_SYNC_JSON env variable:
+ * e.g. ACCOUNTS_SYNC_JSON='[{"email":"...","password":"...","role":"...","department":"...","title":"..."}]'
+ */
+const accounts = process.env.ACCOUNTS_SYNC_JSON
+  ? JSON.parse(process.env.ACCOUNTS_SYNC_JSON)
+  : [];
 
 async function run() {
+  if (accounts.length === 0) {
+    console.log('No accounts configured in ACCOUNTS_SYNC_JSON environment variable.');
+    console.log('To sync accounts, provide a JSON array via ACCOUNTS_SYNC_JSON.');
+    process.exit(0);
+  }
+
   for (const acc of accounts) {
     let fbUser;
     try {
