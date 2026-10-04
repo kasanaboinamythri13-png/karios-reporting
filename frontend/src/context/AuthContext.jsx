@@ -2,14 +2,14 @@
 import React, { createContext, useState, useEffect } from "react";
 
 const MOCK_USERS = {
-  "ceo@karios.local":       { id: "mock-ceo-id",   role: "CEO",            department: null,          title: "CEO" },
-  "dev@karios.local":       { id: "mock-dev-id",   role: "DEVELOPER_HEAD", department: "DEVELOPMENT", title: "Developer Head" },
-  "sales@karios.local":     { id: "mock-sales-id", role: "SALES_HEAD",     department: "SALES",       title: "Sales Head" },
-  "marketing@karios.local": { id: "mock-mktg-id",  role: "MARKETING_HEAD", department: "MARKETING",   title: "Marketing Head" },
-  "finance@karios.local":   { id: "mock-fin-id",   role: "FINANCE_HEAD",   department: "FINANCE",     title: "Finance Head" },
+  "ceo@karios.local": { id: "mock-ceo-id", role: "CEO", department: null, title: "CEO" },
+  "dev@karios.local": { id: "mock-dev-id", role: "DEVELOPER_HEAD", department: "DEVELOPMENT", title: "Developer Head" },
+  "sales@karios.local": { id: "mock-sales-id", role: "SALES_HEAD", department: "SALES", title: "Sales Head" },
+  "marketing@karios.local": { id: "mock-mktg-id", role: "MARKETING_HEAD", department: "MARKETING", title: "Marketing Head" },
+  "finance@karios.local": { id: "mock-fin-id", role: "FINANCE_HEAD", department: "FINANCE", title: "Finance Head" },
 };
 
-const USE_MOCK    = import.meta.env.VITE_USE_MOCK_AUTH === "true";
+const USE_MOCK = import.meta.env.VITE_USE_MOCK_AUTH === "true";
 const SESSION_KEY = "karios_mock_user";
 
 export const AuthContext = createContext(null);
@@ -49,7 +49,7 @@ function MockAuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ appUser, user: appUser, loading: false, login, logout, resetPassword, refreshUser: () => {} }}>
+    <AuthContext.Provider value={{ appUser, user: appUser, loading: false, login, logout, resetPassword, refreshUser: () => { } }}>
       {children}
     </AuthContext.Provider>
   );
@@ -62,8 +62,8 @@ function FirebaseAuthProvider({ children }) {
     let unsub;
     (async () => {
       const { onAuthStateChanged } = await import("firebase/auth");
-      const { auth }               = await import("../services/firebase");
-      const api                    = (await import("../services/api")).default;
+      const { auth } = await import("../services/firebase");
+      const api = (await import("../services/api")).default;
       unsub = onAuthStateChanged(auth, async (fbUser) => {
         if (fbUser) {
           try { const { data } = await api.get("/me"); setAppUser(data); }
@@ -82,7 +82,7 @@ function FirebaseAuthProvider({ children }) {
 
   const logout = async () => {
     const { signOut } = await import("firebase/auth");
-    const { auth }    = await import("../services/firebase");
+    const { auth } = await import("../services/firebase");
     return signOut(auth);
   };
 
