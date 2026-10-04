@@ -236,29 +236,6 @@ export default function LoginPage() {
         ) : (
           /* ── Normal Login View ── */
           <>
-            {/* Quick-login buttons */}
-            {USE_MOCK && (
-              <div style={{ marginBottom: 22 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-text-muted)", marginBottom: 8 }}>
-                  Quick Login
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {DEV_ACCOUNTS.map((acc) => (
-                    <button
-                      key={acc.email}
-                      type="button"
-                      className={`btn btn--sm ${email === acc.email ? "btn--primary" : "btn--outline"}`}
-                      onClick={() => fillAccount(acc)}
-                      id={`quick-login-${acc.label.toLowerCase()}`}
-                      style={{ borderRadius: 20, padding: "5px 14px", fontSize: 12 }}
-                    >
-                      {acc.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <form onSubmit={handleSubmit} noValidate>
               <div className="form-group" style={{ marginBottom: 18 }}>
                 <label className="form-label" htmlFor="login-email" style={{ fontSize: 13, fontWeight: 600 }}>
