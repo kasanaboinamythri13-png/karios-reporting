@@ -7,7 +7,9 @@ import {
   ActivityIndicator, Modal, TextInput, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { getReport, reviewReport } from '../../api/reportsApi';
+import { formatFileSize } from '../../api/attachmentsApi';
 import StatusBadge from '../../components/StatusBadge';
 import { useTheme } from '../../context/ThemeContext';
 import { departmentLetter, departmentLabel, formatRelativeDate, formatISTTime, formatCurrency } from '../../utils/formatters';
@@ -141,6 +143,43 @@ export default function CeoReportDetailScreen() {
           <FieldRow label="Blockers / Impediments" value={report.data?.blockers} colors={colors} />
           <FieldRow label="Plan for Tomorrow" value={report.data?.planTomorrow} colors={colors} />
         </View>
+
+        {/* ── Supporting Attachments Card ── */}
+        {Array.isArray(report.attachments) && report.attachments.length > 0 && (
+          <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Attached Files ({report.attachments.length})
+            </Text>
+            {report.attachments.map((file, idx) => {
+              const name = file.fileName || file.filename || `Attachment ${idx + 1}`;
+              const isPdf = file.mimeType === 'application/pdf' || name.toLowerCase().endsWith('.pdf');
+              return (
+                <View
+                  key={file.id || idx}
+                  style={[styles.fieldRow, { borderBottomColor: colors.border, alignItems: 'center' }]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <Ionicons
+                      name={isPdf ? 'document-text' : 'image'}
+                      size={20}
+                      color={isPdf ? '#EF4444' : '#3B82F6'}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.fieldLabel, { color: colors.text, fontWeight: '600' }]} numberOfLines={1}>
+                        {name}
+                      </Text>
+                      {file.sizeBytes ? (
+                        <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                          {formatFileSize(file.sizeBytes)}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* ── Existing Review Info ── */}
         {report.review_comment ? (

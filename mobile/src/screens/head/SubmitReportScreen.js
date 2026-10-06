@@ -9,6 +9,8 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { submitReport, updateReport, getReport, getTodayReport, getFormSchema } from '../../api/reportsApi';
+import { uploadAttachment, validateAttachment, formatFileSize, MAX_FILES_PER_REPORT } from '../../api/attachmentsApi';
+import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { departmentLabel } from '../../utils/formatters';
@@ -29,6 +31,10 @@ export default function SubmitReportScreen() {
   const [fields, setFields] = useState(() => getDepartmentFields(dept));
   const [values, setValues] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
+
+  // Attachments state
+  const [attachments, setAttachments] = useState([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,10 +60,14 @@ export default function SubmitReportScreen() {
           if (schemaRes?.fields && schemaRes.fields.length > 0) {
             // Merge with local fallback definitions to retain nice placeholders
             const fallbackMap = new Map(currentFields.map((f) => [f.key, f]));
-            currentFields = schemaRes.fields.map((f) => ({
-              ...fallbackMap.get(f.key),
-              ...f,
-            }));
+            currentFields = schemaRes.fields.map((f) => {
+              const localDef = fallbackMap.get(f.key) || {};
+              return {
+                ...f,
+                ...localDef,
+                required: localDef.required !== undefined ? localDef.required : f.required,
+              };
+            });
             if (isMounted) setFields(currentFields);
           }
         } catch {
@@ -78,8 +88,12 @@ export default function SubmitReportScreen() {
 
         if (rep && rep.data && isMounted) {
           setValues(toFormValues(currentFields, rep.data));
+          if (Array.isArray(rep.attachments)) {
+            setAttachments(rep.attachments);
+          }
         } else if (isMounted) {
           setValues(toFormValues(currentFields, {}));
+          setAttachments([]);
         }
       } catch (err) {
         if (isMounted) setValues(toFormValues(getDepartmentFields(dept), {}));
@@ -105,6 +119,68 @@ export default function SubmitReportScreen() {
     }
   };
 
+  const handlePickDocument = async () => {
+    if (attachments.length >= MAX_FILES_PER_REPORT) {
+      Alert.alert('Limit Reached', `A report can have at most ${MAX_FILES_PER_REPORT} attachments.`);
+      return;
+    }
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/jpeg', 'image/png', 'application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+        multiple: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const availableSlots = MAX_FILES_PER_REPORT - attachments.length;
+      const selectedAssets = result.assets.slice(0, availableSlots);
+
+      if (result.assets.length > availableSlots) {
+        Alert.alert('Notice', `Only ${availableSlots} file(s) added to stay within the limit of ${MAX_FILES_PER_REPORT}.`);
+      }
+
+      setUploadingFile(true);
+
+      const newlyUploaded = [];
+      for (const asset of selectedAssets) {
+        const valError = validateAttachment(asset);
+        if (valError) {
+          Alert.alert('Unsupported File', `${asset.name || 'File'}: ${valError}`);
+          continue;
+        }
+
+        try {
+          const res = await uploadAttachment(asset);
+          newlyUploaded.push({
+            id: res.attachmentId,
+            attachmentId: res.attachmentId,
+            fileName: res.fileName || asset.name,
+            mimeType: res.mimeType || asset.mimeType,
+            sizeBytes: res.sizeBytes || asset.size,
+          });
+        } catch (uploadErr) {
+          Alert.alert('Upload Failed', `Could not upload "${asset.name}": ${uploadErr.message}`);
+        }
+      }
+
+      if (newlyUploaded.length > 0) {
+        setAttachments((prev) => [...prev, ...newlyUploaded]);
+      }
+    } catch (err) {
+      Alert.alert('File Picker Error', err.message || 'Could not open file picker.');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleRemoveAttachment = (targetId) => {
+    setAttachments((prev) => prev.filter((a) => (a.id || a.attachmentId) !== targetId));
+  };
+
   async function handleSubmit() {
     const { data, errors } = buildReportData(fields, values);
     if (Object.keys(errors).length > 0) {
@@ -116,7 +192,8 @@ export default function SubmitReportScreen() {
 
     setSaving(true);
     try {
-      const payload = { data };
+      const attachmentIds = attachments.map((a) => a.id || a.attachmentId).filter(Boolean);
+      const payload = { data, attachmentIds };
 
       if (activeReportId) {
         await updateReport(activeReportId, payload);
@@ -145,6 +222,7 @@ export default function SubmitReportScreen() {
                   if (repObj?.id) {
                     setActiveReportId(repObj.id);
                     if (repObj.data) setValues(toFormValues(fields, repObj.data));
+                    if (Array.isArray(repObj.attachments)) setAttachments(repObj.attachments);
                   }
                 } catch {
                   // Ignore
@@ -235,7 +313,7 @@ export default function SubmitReportScreen() {
                     {field.required && <Text style={styles.requiredStar}> *</Text>}
                   </Text>
                   {field.type === 'currency' && (
-                    <Text style={[styles.currencyHint, { color: colors.textMuted }]}>in INR (₹)</Text>
+                    <Text style={[styles.currencyHint, { color: colors.textMuted }]}>in USD ($)</Text>
                   )}
                 </View>
 
@@ -285,19 +363,95 @@ export default function SubmitReportScreen() {
         {/* ── Supporting Attachments Card ── */}
         <View style={[styles.attachmentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.attachmentHeader}>
-            <Text style={[styles.attachmentTitle, { color: colors.textSecondary }]}>SUPPORTING ATTACHMENTS</Text>
+            <View style={styles.attachmentTitleRow}>
+              <Text style={[styles.attachmentTitle, { color: colors.textSecondary }]}>SUPPORTING ATTACHMENTS</Text>
+              {attachments.length > 0 && (
+                <View style={[styles.countBadge, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.25)' : '#EDE9FE' }]}>
+                  <Text style={[styles.countBadgeText, { color: colors.primary }]}>{attachments.length}/5</Text>
+                </View>
+              )}
+            </View>
             <TouchableOpacity
-              style={[styles.attachBtn, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : '#EDE9FE' }]}
-              onPress={() => Alert.alert('Attachments', 'Select PDF, CSV, or screenshot to attach.')}
+              style={[
+                styles.attachBtn,
+                { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : '#EDE9FE' },
+                uploadingFile && styles.attachBtnDisabled,
+              ]}
+              onPress={handlePickDocument}
+              disabled={uploadingFile}
               activeOpacity={0.8}
             >
-              <Ionicons name="attach" size={14} color={colors.primary} />
-              <Text style={[styles.attachBtnText, { color: colors.primary }]}>Attach File</Text>
+              {uploadingFile ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="attach" size={15} color={colors.primary} />
+              )}
+              <Text style={[styles.attachBtnText, { color: colors.primary }]}>
+                {uploadingFile ? 'Uploading...' : 'Attach File'}
+              </Text>
             </TouchableOpacity>
           </View>
-          <Text style={[styles.attachmentSub, { color: colors.textMuted }]}>
-            No files attached. Optional PDF, CSV, or screenshots.
-          </Text>
+
+          {attachments.length === 0 ? (
+            <TouchableOpacity
+              style={[styles.emptyAttachZone, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0' }]}
+              onPress={handlePickDocument}
+              disabled={uploadingFile}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="cloud-upload-outline" size={24} color={colors.textMuted} />
+              <Text style={[styles.attachmentSub, { color: colors.textMuted }]}>
+                Attach PDF or screenshots (up to 5 MB each, max 5 files)
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.attachmentList}>
+              {attachments.map((file, idx) => {
+                const id = file.id || file.attachmentId || `att-${idx}`;
+                const name = file.fileName || file.filename || 'Attachment';
+                const isPdf = file.mimeType === 'application/pdf' || name.toLowerCase().endsWith('.pdf');
+
+                return (
+                  <View
+                    key={id}
+                    style={[
+                      styles.fileItem,
+                      {
+                        backgroundColor: colors.inputBg,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.fileIconBox, { backgroundColor: isPdf ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)' }]}>
+                      <Ionicons
+                        name={isPdf ? 'document-text' : 'image'}
+                        size={18}
+                        color={isPdf ? '#EF4444' : '#3B82F6'}
+                      />
+                    </View>
+                    <View style={styles.fileInfo}>
+                      <Text style={[styles.fileName, { color: colors.text }]} numberOfLines={1}>
+                        {name}
+                      </Text>
+                      {file.sizeBytes ? (
+                        <Text style={[styles.fileSize, { color: colors.textMuted }]}>
+                          {formatFileSize(file.sizeBytes)}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.removeFileBtn}
+                      onPress={() => handleRemoveAttachment(id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         {/* ── Action Buttons Row ── */}
@@ -414,12 +568,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 6,
     elevation: 2,
-    gap: 6,
+    gap: 8,
   },
   attachmentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  attachmentTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  countBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
   },
   attachmentTitle: {
     fontSize: 12,
@@ -434,12 +602,60 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
   },
+  attachBtnDisabled: {
+    opacity: 0.6,
+  },
   attachBtnText: {
     fontSize: 12,
     fontWeight: '700',
   },
+  emptyAttachZone: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 10,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
   attachmentSub: {
     fontSize: 12,
+    textAlign: 'center',
+  },
+  attachmentList: {
+    gap: 8,
+    marginTop: 6,
+  },
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 10,
+  },
+  fileIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fileInfo: {
+    flex: 1,
+  },
+  fileName: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  fileSize: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  removeFileBtn: {
+    padding: 4,
   },
 
   buttonsRow: {
