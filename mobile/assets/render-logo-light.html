@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: transparent;
+    width: 320px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .symbol {
+    flex-shrink: 0;
+  }
+  .text-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: 1.15;
+  }
+  .title {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    color: #1f2937;
+  }
+  .subtitle {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: #6b7280;
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <svg class="symbol" width="38" height="38" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="kariosCyanGrad" x1="4" y1="4" x2="28" y2="16" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#00d2ff" />
+        <stop offset="100%" stop-color="#2563eb" />
+      </linearGradient>
+      <linearGradient id="kariosPurpleGrad" x1="4" y1="16" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#6366f1" />
+        <stop offset="100%" stop-color="#8b5cf6" />
+      </linearGradient>
+    </defs>
+    <path
+      d="M7 6C7 4.89543 7.89543 4 9 4H23C24.1046 4 25 4.89543 25 6V8.5C25 9.61462 24.536 10.6782 23.7226 11.4389L17.5 17.25C16.6667 18.0289 15.3333 18.0289 14.5 17.25L8.27744 11.4389C7.46399 10.6782 7 9.61462 7 8.5V6Z"
+      stroke="url(#kariosCyanGrad)"
+      stroke-width="2.8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M25 26C25 27.1046 24.1046 28 23 28H9C7.89543 28 7 27.1046 7 26V23.5C7 22.3854 7.46399 21.3218 8.27744 20.5611L14.5 14.75C15.3333 13.9711 16.6667 13.9711 17.5 14.75L23.7226 20.5611C24.536 21.3218 25 22.3854 25 23.5V26Z"
+      stroke="url(#kariosPurpleGrad)"
+      stroke-width="2.8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </svg>
+  <div class="text-col">
+    <span class="title">Karios</span>
+    <span class="subtitle">REPORTING</span>
+  </div>
+</div>
+</body>
+</html>
