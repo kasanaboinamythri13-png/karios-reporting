@@ -10,7 +10,7 @@
       "backgroundColor": "#7C3AED"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "com.karios.reporting"
     },
     "android": {

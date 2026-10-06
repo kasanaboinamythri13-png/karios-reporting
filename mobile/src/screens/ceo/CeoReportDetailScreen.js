@@ -1,354 +1,588 @@
-// src/screens/ceo/CeoReportDetailScreen.js
-// Full report detail with Approve / Reject modal for CEO
-
-import React, { useEffect, useState } from 'react';
+// mobile/src/screens/ceo/CeoReportDetailScreen.js
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Modal, TextInput, Alert, KeyboardAvoidingView, Platform,
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getReport, reviewReport } from '../../api/reportsApi';
-import { formatFileSize } from '../../api/attachmentsApi';
-import StatusBadge from '../../components/StatusBadge';
+import { api } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
-import { departmentLetter, departmentLabel, formatRelativeDate, formatISTTime, formatCurrency } from '../../utils/formatters';
+import { colors } from '../../theme/colors';
+import { formatDate, formatDateTime } from '../../utils/date';
+import { departmentLabel } from '../../utils/roles';
+import { formatUSD } from '../../utils/currency';
+import Header from '../../components/Header';
+import StatusBadge from '../../components/StatusBadge';
+import { LoadingScreen, ErrorBanner } from '../../components/Feedback';
 
-function FieldRow({ label, value, colors }) {
-  if (!value && value !== 0) return null;
-  return (
-    <View style={[styles.fieldRow, { borderBottomColor: colors.border }]}>
-      <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>{label}</Text>
-      <Text style={[styles.fieldValue, { color: colors.text }]}>{value}</Text>
-    </View>
-  );
-}
+const FORM_FIELDS = {
+  DEVELOPMENT: [
+    { key: 'tasksCompleted', label: 'Tasks Completed', type: 'textarea' },
+    { key: 'tasksInProgress', label: 'Tasks In Progress', type: 'textarea' },
+    { key: 'bugsFixed', label: 'Bugs Fixed', type: 'number' },
+    { key: 'deployments', label: 'Deployments', type: 'number' },
+    { key: 'blockers', label: 'Blockers', type: 'textarea' },
+    { key: 'planTomorrow', label: 'Plan for Tomorrow', type: 'textarea' },
+  ],
+  SALES: [
+    { key: 'newLeads', label: 'New Leads', type: 'number' },
+    { key: 'followUps', label: 'Follow-ups', type: 'number' },
+    { key: 'dealsClosed', label: 'Deals Closed', type: 'number' },
+    { key: 'revenueClosed', label: 'Revenue Closed', type: 'currency' },
+    { key: 'pipelineValue', label: 'Pipeline Value', type: 'currency' },
+    { key: 'blockers', label: 'Blockers', type: 'textarea' },
+    { key: 'planTomorrow', label: 'Plan for Tomorrow', type: 'textarea' },
+  ],
+  MARKETING: [
+    { key: 'activeCampaigns', label: 'Active Campaigns', type: 'number' },
+    { key: 'spend', label: 'Marketing Spend', type: 'currency' },
+    { key: 'impressions', label: 'Impressions', type: 'number' },
+    { key: 'clicks', label: 'Clicks', type: 'number' },
+    { key: 'leadsGenerated', label: 'Leads Generated', type: 'number' },
+    { key: 'blockers', label: 'Blockers', type: 'textarea' },
+    { key: 'planTomorrow', label: 'Plan for Tomorrow', type: 'textarea' },
+  ],
+  FINANCE: [
+    { key: 'collections', label: 'Collections', type: 'currency' },
+    { key: 'paymentsMade', label: 'Payments Made', type: 'currency' },
+    { key: 'expenses', label: 'Expenses', type: 'currency' },
+    { key: 'pendingInvoices', label: 'Pending Invoices', type: 'number' },
+    { key: 'cashPosition', label: 'Cash Position', type: 'currency' },
+    { key: 'blockers', label: 'Blockers', type: 'textarea' },
+    { key: 'planTomorrow', label: 'Plan for Tomorrow', type: 'textarea' },
+  ],
+};
 
-export default function CeoReportDetailScreen() {
-  const route      = useRoute();
-  const navigation = useNavigation();
+export default function CeoReportDetailScreen({ route, navigation }) {
   const { colors, isDark } = useTheme();
-  const { reportId } = route.params;
+  const { reportId, id, report_id, department, departmentTitle } = route.params || {};
+  const activeReportId = reportId || id || report_id;
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [comment, setComment] = useState('');
 
-  const [report, setReport]         = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [modalVisible, setModal]    = useState(false);
-  const [reviewAction, setAction]   = useState(null); // 'APPROVED' | 'REJECTED'
-  const [comment, setComment]       = useState('');
-  const [saving, setSaving]         = useState(false);
+  const fetchReport = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (activeReportId) {
+        const res = await api.getReport(activeReportId);
+        const rep = res?.report || res?.data || res;
+        if (rep && (rep.id || rep.department || rep.status)) {
+          setReport(rep);
+          return;
+        }
+      }
+
+      // Fallback: If no reportId but department is provided, check for latest report
+      if (department) {
+        const res = await api.getReports({ department });
+        const list = res?.reports || res?.data || (Array.isArray(res) ? res : []);
+        if (list.length > 0) {
+          setReport(list[0]);
+          return;
+        }
+      }
+
+      setError('Report not found.');
+    } catch (err) {
+      setError(err.message || 'Failed to load report from server.');
+    } finally {
+      setLoading(false);
+    }
+  }, [activeReportId, department]);
 
   useEffect(() => {
-    getReport(reportId)
-      .then(setReport)
-      .catch(() => Alert.alert('Error', 'Could not load report.'))
-      .finally(() => setLoading(false));
-  }, [reportId]);
+    fetchReport();
+  }, [fetchReport]);
 
-  async function handleReview() {
-    setSaving(true);
-    try {
-      await reviewReport(reportId, { status: reviewAction, comment: comment.trim() });
-      setModal(false);
-      const updated = await getReport(reportId);
-      setReport(updated);
-      Alert.alert('Done', `Report ${reviewAction === 'APPROVED' ? 'approved' : 'rejected'} successfully.`);
-    } catch (err) {
-      Alert.alert('Error', err?.response?.data?.message || 'Could not submit review.');
-    } finally {
-      setSaving(false);
+  const handleReview = async (decision) => {
+    if (decision === 'REJECTED' && !comment.trim()) {
+      Alert.alert(
+        'Rejection Comment Required',
+        'Please enter a comment explaining why this report is rejected. A comment is mandatory when rejecting a report.'
+      );
+      return;
     }
-  }
 
-  function openModal(action) {
-    setAction(action);
-    setComment('');
-    setModal(true);
-  }
+    Alert.alert(
+      decision === 'APPROVED' ? 'Approve Report' : 'Reject Report',
+      `Are you sure you want to mark this report as ${decision.toLowerCase()}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: decision === 'APPROVED' ? 'Approve' : 'Reject',
+          style: decision === 'REJECTED' ? 'destructive' : 'default',
+          onPress: async () => {
+            setSubmitting(true);
+            try {
+              const currentId = activeReportId || report?.id;
+              await api.reviewReport(currentId, {
+                status: decision,
+                comment: comment.trim(),
+              });
+              Alert.alert('Success', `Report has been marked as ${decision}.`);
+              setReport((prev) => {
+                const base = prev?.report || prev || {};
+                return {
+                  ...base,
+                  status: decision,
+                  review_comment: comment.trim(),
+                  reviewed_at: new Date().toISOString(),
+                };
+              });
+              setComment('');
+            } catch (err) {
+              Alert.alert('Review Failed', err.message || 'Could not submit review to server.');
+            } finally {
+              setSubmitting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   if (loading) {
-    return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <LoadingScreen message="Loading report details..." />;
   }
+
   if (!report) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Text style={[styles.errorText, { color: colors.text }]}>Report not found.</Text>
-        <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={() => navigation.goBack()}>
-          <Text style={styles.retryText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header title="Report Details" onBack={() => navigation.goBack()} />
+        <View style={{ padding: 20 }}>
+          <ErrorBanner message={error || 'Report not found.'} onRetry={fetchReport} />
+          <TouchableOpacity
+            style={[styles.goBackBtn, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={16} color={colors.primary} />
+            <Text style={[styles.goBackBtnText, { color: colors.primary }]}>Go Back to Dashboard</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  const canReview = report.status === 'SUBMITTED';
+  const currentReport = report?.report || report || {};
+  const deptKey = currentReport.department || department || 'DEVELOPMENT';
+  const fields = FORM_FIELDS[deptKey] || FORM_FIELDS.DEVELOPMENT;
+  const reportData = { ...(currentReport.data || {}), ...currentReport };
+  const isPending = currentReport.status === 'SUBMITTED';
+
+  const numericFields = fields.filter((f) => f.type === 'number' || f.type === 'currency');
+  const narrativeFields = fields.filter((f) => f.type === 'textarea');
 
   return (
-    <>
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-        {/* ── Report Header ── */}
-        <View style={[styles.header, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.headerLeft}>
-            <View style={[styles.deptBadge, { backgroundColor: colors.primary }]}>
-              <Text style={styles.deptBadgeText}>{departmentLetter(report.department)}</Text>
-            </View>
-            <View>
-              <Text style={[styles.deptTitle, { color: colors.text }]}>{departmentLabel(report.department)}</Text>
-              <Text style={[styles.deptSub, { color: colors.textSecondary }]}>{formatRelativeDate(report.report_date)}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <Header
+        title={`${departmentLabel(deptKey)} Report`}
+        subtitle={formatDate(currentReport.date || currentReport.created_at)}
+        onBack={() => navigation.goBack()}
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <ErrorBanner message={error} onRetry={fetchReport} />
+
+          {/* Header Card */}
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+            <View style={styles.titleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.reportTitle, { color: colors.text }]}>
+                  {departmentLabel(deptKey)} Daily Report
+                </Text>
+                <Text style={[styles.submittedByText, { color: colors.primary }]}>
+                  Submitted by {currentReport.head_title || departmentTitle || 'Head'}
+                </Text>
+                <Text style={[styles.dateSubtext, { color: colors.textMuted }]}>
+                  {formatDateTime(currentReport.created_at)}
+                </Text>
+              </View>
+              <StatusBadge status={currentReport.status} />
             </View>
           </View>
-          <StatusBadge status={report.status} />
-        </View>
 
-        <Text style={[styles.submittedAt, { color: colors.textMuted }]}>
-          Submitted at {formatISTTime(report.created_at)}
-        </Text>
-
-        {/* ── Department Specific Metrics ── */}
-        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Key Metrics</Text>
-          {report.department === 'FINANCE' && (
-            <>
-              <FieldRow label="Collections" value={formatCurrency(report.data?.collections)} colors={colors} />
-              <FieldRow label="Payments Made" value={formatCurrency(report.data?.paymentsMade)} colors={colors} />
-            </>
-          )}
-          {report.department === 'SALES' && (
-            <>
-              <FieldRow label="Revenue Closed" value={formatCurrency(report.data?.revenueClosed)} colors={colors} />
-              <FieldRow label="New Leads" value={report.data?.newLeads} colors={colors} />
-            </>
-          )}
-          {report.department === 'MARKETING' && (
-            <>
-              <FieldRow label="Active Campaigns" value={report.data?.activeCampaigns} colors={colors} />
-              <FieldRow label="Spend" value={formatCurrency(report.data?.spend)} colors={colors} />
-            </>
-          )}
-          {report.department === 'DEVELOPMENT' && (
-            <>
-              <FieldRow label="Bugs Fixed" value={report.data?.bugsFixed} colors={colors} />
-              <FieldRow label="Deployments" value={report.data?.deployments} colors={colors} />
-            </>
-          )}
-        </View>
-
-        {/* ── Tasks ── */}
-        <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Operations & Tasks</Text>
-          <FieldRow label="Tasks Completed" value={report.data?.tasksCompleted} colors={colors} />
-          <FieldRow label="Tasks In Progress" value={report.data?.tasksInProgress} colors={colors} />
-          <FieldRow label="Blockers / Impediments" value={report.data?.blockers} colors={colors} />
-          <FieldRow label="Plan for Tomorrow" value={report.data?.planTomorrow} colors={colors} />
-        </View>
-
-        {/* ── Supporting Attachments Card ── */}
-        {Array.isArray(report.attachments) && report.attachments.length > 0 && (
-          <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Attached Files ({report.attachments.length})
-            </Text>
-            {report.attachments.map((file, idx) => {
-              const name = file.fileName || file.filename || `Attachment ${idx + 1}`;
-              const isPdf = file.mimeType === 'application/pdf' || name.toLowerCase().endsWith('.pdf');
-              return (
-                <View
-                  key={file.id || idx}
-                  style={[styles.fieldRow, { borderBottomColor: colors.border, alignItems: 'center' }]}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                    <Ionicons
-                      name={isPdf ? 'document-text' : 'image'}
-                      size={20}
-                      color={isPdf ? '#EF4444' : '#3B82F6'}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.fieldLabel, { color: colors.text, fontWeight: '600' }]} numberOfLines={1}>
-                        {name}
-                      </Text>
-                      {file.sizeBytes ? (
-                        <Text style={{ fontSize: 11, color: colors.textMuted }}>
-                          {formatFileSize(file.sizeBytes)}
-                        </Text>
-                      ) : null}
+          {/* Numeric Metrics Grid */}
+          {numericFields.length > 0 && (
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+              <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>Daily Metrics</Text>
+              <View style={styles.metricsGrid}>
+                {numericFields.map((nf) => {
+                  const rawVal = reportData[nf.key];
+                  const val =
+                    rawVal !== undefined && rawVal !== null
+                      ? nf.type === 'currency'
+                        ? formatUSD(rawVal)
+                        : String(rawVal)
+                      : '—';
+                  return (
+                    <View key={nf.key} style={[styles.metricBox, { backgroundColor: colors.background }]}>
+                      <Text style={[styles.metricValue, { color: colors.text }]}>{val}</Text>
+                      <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{nf.label}</Text>
                     </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Narrative Operations Fields */}
+          {narrativeFields.map((nf) => {
+            const val = reportData[nf.key];
+            if (!val && val !== '') return null;
+            const isBlocker = nf.key.toLowerCase().includes('blocker');
+
+            return (
+              <View
+                key={nf.key}
+                style={[
+                  styles.card,
+                  { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+                  isBlocker && Boolean(val) && [
+                    styles.blockerCard,
+                    {
+                      backgroundColor: isDark ? 'rgba(217, 119, 6, 0.15)' : colors.pendingBg,
+                      borderColor: isDark ? 'rgba(217, 119, 6, 0.4)' : colors.pendingBorder,
+                    },
+                  ],
+                ]}
+              >
+                {isBlocker ? (
+                  <View style={styles.blockerTitleRow}>
+                    <Ionicons name="warning-outline" size={16} color={colors.pending} />
+                    <Text style={[styles.blockerTitle, { color: colors.pending }]}>{nf.label}</Text>
                   </View>
+                ) : (
+                  <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>{nf.label}</Text>
+                )}
+                <Text
+                  style={[
+                    styles.narrativeText,
+                    { color: colors.text },
+                    isBlocker && { color: isDark ? '#fef3c7' : colors.text },
+                  ]}
+                >
+                  {val || 'None reported.'}
+                </Text>
+              </View>
+            );
+          })}
+
+          {/* Attachments Section */}
+          {currentReport.attachments && currentReport.attachments.length > 0 && (
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+              <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>Attachments</Text>
+              {currentReport.attachments.map((att, idx) => (
+                <View key={idx} style={[styles.attachmentRow, { backgroundColor: colors.background }]}>
+                  <Ionicons name="document-attach-outline" size={20} color={colors.primary} />
+                  <Text style={[styles.attachmentName, { color: colors.text }]}>
+                    {att.name || `Document #${idx + 1}`}
+                  </Text>
                 </View>
-              );
-            })}
+              ))}
+            </View>
+          )}
+
+          {/* CEO Decision Actions */}
+          <View style={[styles.card, styles.reviewCard, { backgroundColor: colors.surface, borderColor: isDark ? colors.surfaceBorder : colors.primarySurface }]}>
+            <Text style={[styles.reviewCardTitle, { color: colors.text }]}>CEO Review</Text>
+
+            {isPending ? (
+              <>
+                <Text style={[styles.reviewLabel, { color: colors.textMuted }]}>
+                  CEO Feedback & Directives (Optional for approval, mandatory for rejection):
+                </Text>
+                <TextInput
+                  style={[
+                    styles.commentInput,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.surfaceBorder,
+                      color: colors.text,
+                    },
+                  ]}
+                  placeholder="Enter comments or directives (mandatory if rejecting)..."
+                  placeholderTextColor={colors.textLight}
+                  multiline
+                  numberOfLines={4}
+                  value={comment}
+                  onChangeText={setComment}
+                  textAlignVertical="top"
+                />
+
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.approveBtn]}
+                    onPress={() => handleReview('APPROVED')}
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                        <Text style={styles.actionBtnText}>Approve</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.rejectBtn]}
+                    onPress={() => handleReview('REJECTED')}
+                    disabled={submitting}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#fff" />
+                    <Text style={styles.actionBtnText}>Reject</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <View
+                style={[
+                  styles.reviewedNotice,
+                  currentReport.status === 'APPROVED'
+                    ? [styles.reviewedApproved, { backgroundColor: colors.approvedBg, borderColor: colors.approvedBorder }]
+                    : currentReport.status === 'REJECTED'
+                    ? [styles.reviewedRejected, { backgroundColor: colors.rejectedBg, borderColor: colors.rejectedBorder }]
+                    : [styles.reviewedNotice, { backgroundColor: colors.surfaceBorder, borderColor: colors.surfaceBorder }],
+                ]}
+              >
+                <Ionicons
+                  name={
+                    currentReport.status === 'APPROVED'
+                      ? 'checkmark-circle'
+                      : currentReport.status === 'REJECTED'
+                      ? 'close-circle'
+                      : 'time-outline'
+                  }
+                  size={24}
+                  color={
+                    currentReport.status === 'APPROVED'
+                      ? colors.approved
+                      : currentReport.status === 'REJECTED'
+                      ? colors.rejected
+                      : colors.textMuted
+                  }
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.reviewedStatusText, { color: colors.text }]}>
+                    {currentReport.status === 'APPROVED'
+                      ? 'Report Approved by CEO'
+                      : currentReport.status === 'REJECTED'
+                      ? 'Report Rejected by CEO'
+                      : 'Awaiting Submission'}
+                  </Text>
+                  {currentReport.review_comment ? (
+                    <Text style={[styles.reviewedCommentText, { color: colors.text }]}>
+                      "{currentReport.review_comment}"
+                    </Text>
+                  ) : null}
+                  {currentReport.reviewed_at ? (
+                    <Text style={[styles.reviewedDateText, { color: colors.textMuted }]}>
+                      Reviewed {formatDateTime(currentReport.reviewed_at)}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            )}
           </View>
-        )}
-
-        {/* ── Existing Review Info ── */}
-        {report.review_comment ? (
-          <View style={[styles.reviewSection, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : colors.primarySoft }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>CEO Review</Text>
-            <Text style={[styles.reviewComment, { color: colors.text }]}>{report.review_comment}</Text>
-            {report.reviewed_at ? (
-              <Text style={[styles.reviewAt, { color: colors.textMuted }]}>
-                Reviewed on {formatISTTime(report.reviewed_at)}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-
-        {/* ── Approve / Reject Buttons (CEO action) ── */}
-        {canReview && (
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.approveBtn, { backgroundColor: colors.approved }]}
-              onPress={() => openModal('APPROVED')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.actionBtnText}>✓ Approve Report</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.rejectBtn, { backgroundColor: colors.rejected }]}
-              onPress={() => openModal('REJECTED')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.actionBtnText}>✕ Reject Report</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* ── Review Confirmation Modal ── */}
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <KeyboardAvoidingView
-          style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
-            <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {reviewAction === 'APPROVED' ? 'Approve Report' : 'Reject Report'}
-            </Text>
-            <Text style={[styles.modalSub, { color: colors.textSecondary }]}>
-              {reviewAction === 'APPROVED'
-                ? 'Optionally add a note of recognition or feedback.'
-                : 'Please explain why this report is being rejected so the department head can address it.'}
-            </Text>
-
-            <Text style={[styles.commentLabel, { color: colors.text }]}>
-              {reviewAction === 'APPROVED' ? 'Review Note (optional)' : 'Reason for Rejection *'}
-            </Text>
-            <TextInput
-              style={[
-                styles.commentInput,
-                { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text },
-              ]}
-              value={comment}
-              onChangeText={setComment}
-              placeholder={reviewAction === 'APPROVED' ? 'Great work on closing the deals...' : 'Metrics seem inconsistent with target...'}
-              placeholderTextColor={colors.textMuted}
-              multiline
-              textAlignVertical="top"
-            />
-
-            <TouchableOpacity
-              style={[
-                styles.confirmBtn,
-                reviewAction === 'APPROVED' ? { backgroundColor: colors.approved } : { backgroundColor: colors.rejected },
-                saving && styles.confirmDisabled,
-              ]}
-              onPress={handleReview}
-              disabled={saving}
-            >
-              {saving
-                ? <ActivityIndicator color="#FFFFFF" />
-                : <Text style={styles.confirmText}>
-                    {reviewAction === 'APPROVED' ? 'Confirm Approval' : 'Confirm Rejection'}
-                  </Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelModal} onPress={() => setModal(false)}>
-              <Text style={[styles.cancelModalText, { color: colors.textSecondary }]}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    </>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content:   { padding: 20, paddingBottom: 48, gap: 16 },
-  center:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  errorText: { fontSize: 16, marginBottom: 16 },
-  retryBtn:  { borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
-  retryText: { color: '#FFFFFF', fontWeight: '700' },
-
-  header: {
-    borderRadius: 16, padding: 18,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    gap: 14,
+    paddingBottom: 40,
+  },
+  card: {
+    borderRadius: 14,
+    padding: 18,
     borderWidth: 1,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  deptBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
-  deptBadgeText: {
+  reportTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  submittedByText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  dateSubtext: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  metricBox: {
+    flex: 1,
+    minWidth: '45%',
+    padding: 12,
+    borderRadius: 10,
+  },
+  metricValue: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#FFFFFF',
   },
-  deptTitle:  { fontSize: 18, fontWeight: '800', marginBottom: 2 },
-  deptSub:    { fontSize: 13 },
-  submittedAt:{ fontSize: 12, marginTop: -8 },
-
-  section: {
-    borderRadius: 16, padding: 18, gap: 12,
-    borderWidth: 1,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+  metricLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
   },
-  sectionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  fieldRow:  { borderBottomWidth: 1, paddingBottom: 10, gap: 4 },
-  fieldLabel:{ fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
-  fieldValue:{ fontSize: 15, lineHeight: 21 },
-
-  reviewSection: {
-    borderRadius: 16, padding: 16, gap: 8,
+  narrativeText: {
+    fontSize: 14,
+    lineHeight: 22,
   },
-  reviewAt:      { fontSize: 12 },
-  reviewComment: { fontSize: 14, lineHeight: 20 },
-
-  actionRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
-  actionBtn: {
-    flex: 1, borderRadius: 14, paddingVertical: 16, alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18, shadowRadius: 10, elevation: 4,
+  blockerCard: {},
+  blockerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
   },
-  actionBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-
-  // Review Modal
-  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-  modalSheet:   {
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 40, gap: 14,
+  blockerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
-  modalHandle:  { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
-  modalTitle:   { fontSize: 20, fontWeight: '800' },
-  modalSub:     { fontSize: 13, marginTop: -6 },
-  commentLabel: { fontSize: 13, fontWeight: '600' },
-  commentInput: {
-    borderRadius: 12, padding: 14,
-    fontSize: 15, minHeight: 100,
+  attachmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  attachmentName: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  reviewCard: {
+    borderRadius: 16,
+    padding: 20,
     borderWidth: 1.5,
+    elevation: 2,
   },
-  confirmBtn:     { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  confirmDisabled:{ opacity: 0.6 },
-  confirmText:    { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  cancelModal:    { alignItems: 'center', paddingVertical: 12 },
-  cancelModalText:{ fontSize: 15 },
+  reviewCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
+  reviewLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 14,
+    minHeight: 88,
+    marginBottom: 16,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  approveBtn: {
+    backgroundColor: '#059669',
+  },
+  rejectBtn: {
+    backgroundColor: '#dc2626',
+  },
+  actionBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reviewedNotice: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  reviewedApproved: {},
+  reviewedRejected: {},
+  reviewedStatusText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  reviewedCommentText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  reviewedDateText: {
+    fontSize: 11,
+    marginTop: 6,
+  },
+  goBackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 14,
+  },
+  goBackBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });

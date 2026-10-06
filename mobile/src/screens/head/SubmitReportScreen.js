@@ -346,7 +346,7 @@ export default function SubmitReportScreen() {
 
                 {field.key === 'blockers' && (
                   <Text style={[styles.fieldHintText, { color: colors.textSecondary }]}>
-                    Shown to the CEO on the executive dashboard.
+                    Shown to the CEO on the CEO dashboard.
                   </Text>
                 )}
 

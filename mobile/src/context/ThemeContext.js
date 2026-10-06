@@ -1,51 +1,72 @@
-// src/context/ThemeContext.js
-import React, { createContext, useContext, useState, useEffect } from 'react';
+// mobile/src/context/ThemeContext.js
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LightColors, DarkColors } from '../theme/colors';
+import { useAuth } from './AuthContext';
+import { lightColors, darkColors, LightColors, DarkColors } from '../theme/colors';
 
 const THEME_STORAGE_KEY = '@karios_theme';
 
 const ThemeContext = createContext({
   theme: 'light',
   isDark: false,
-  colors: LightColors,
-  toggleTheme: () => {},
+  colors: lightColors,
   setTheme: () => {},
+  toggleTheme: () => {},
+  isCeoRole: false,
 });
 
 export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState('light');
+  const { user } = useAuth();
+  const [themePreference, setThemePreference] = useState('light');
 
+  // Load saved theme on mount
   useEffect(() => {
+    let isMounted = true;
     (async () => {
       try {
         const saved = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-        if (saved === 'dark' || saved === 'light') {
-          setThemeState(saved);
+        if (isMounted && (saved === 'dark' || saved === 'light')) {
+          setThemePreference(saved);
         }
-      } catch (e) {
-        // Fallback to light
-      }
+      } catch {}
     })();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const setTheme = async (nextTheme) => {
+  const changeTheme = async (nextTheme) => {
     const val = nextTheme === 'dark' ? 'dark' : 'light';
-    setThemeState(val);
+    setThemePreference(val);
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, val);
-    } catch (e) {}
+    } catch {}
   };
 
   const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
+    changeTheme(themePreference === 'light' ? 'dark' : 'light');
   };
 
-  const isDark = theme === 'dark';
-  const colors = isDark ? DarkColors : LightColors;
+  // Rule: Dark theme is available for CEO; Department Heads stay in Light theme
+  const isCeoRole = user?.role === 'CEO';
+  const effectiveTheme = isCeoRole ? themePreference : 'light';
+  const isDark = effectiveTheme === 'dark';
+  const activeColors = isDark ? darkColors : lightColors;
+
+  const value = useMemo(
+    () => ({
+      theme: effectiveTheme,
+      isDark,
+      colors: activeColors,
+      setTheme: changeTheme,
+      toggleTheme,
+      isCeoRole,
+    }),
+    [effectiveTheme, isDark, activeColors, isCeoRole]
+  );
 
   return (
-    <ThemeContext.Provider value={{ theme, isDark, colors, toggleTheme, setTheme }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );
@@ -60,6 +81,7 @@ export function useTheme() {
       colors: LightColors,
       toggleTheme: () => {},
       setTheme: () => {},
+      isCeoRole: false,
     };
   }
   return ctx;

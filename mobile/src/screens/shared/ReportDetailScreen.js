@@ -29,7 +29,7 @@ export default function ReportDetailScreen() {
       return;
     }
     getReport(reportId)
-      .then(setReport)
+      .then((res) => setReport(res?.report || res))
       .catch(() => Alert.alert('Error', 'Could not load report.'))
       .finally(() => setLoading(false));
   }, [reportId]);

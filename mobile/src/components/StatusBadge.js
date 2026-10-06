@@ -1,25 +1,74 @@
-// src/components/StatusBadge.js
+// mobile/src/components/StatusBadge.js
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { STATUS_CONFIG } from '../utils/roles';
 import { useTheme } from '../context/ThemeContext';
 
-export default function StatusBadge({ status, small = false }) {
-  const { colors } = useTheme();
+export default function StatusBadge({ status, size = 'medium', small = false }) {
+  const { colors, isDark } = useTheme();
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG.NOT_SUBMITTED;
 
-  const config = {
-    APPROVED: { label: 'Approved',       bg: colors.approvedBg, color: colors.approvedText, dot: colors.approved },
-    REJECTED: { label: 'Rejected',       bg: colors.rejectedBg, color: colors.rejectedText, dot: colors.rejected },
-    SUBMITTED:{ label: 'Pending Review', bg: colors.pendingBg,  color: colors.pendingText,  dot: colors.pending  },
-    MISSING:  { label: 'Not Submitted',  bg: colors.missingBg,  color: colors.missingText,  dot: colors.missing  },
-  };
+  const isSmall = size === 'small' || small === true;
 
-  const cfg = config[status] || config.MISSING;
+  const badgeColor = isDark
+    ? (status === 'APPROVED'
+        ? colors.approved
+        : status === 'REJECTED'
+        ? colors.rejected
+        : status === 'SUBMITTED'
+        ? colors.pending
+        : colors.missing)
+    : config.color;
+
+  const badgeBg = isDark
+    ? (status === 'APPROVED'
+        ? colors.approvedBg
+        : status === 'REJECTED'
+        ? colors.rejectedBg
+        : status === 'SUBMITTED'
+        ? colors.pendingBg
+        : colors.missingBg)
+    : config.bg;
+
+  const badgeBorder = isDark
+    ? (status === 'APPROVED'
+        ? colors.approvedBorder
+        : status === 'REJECTED'
+        ? colors.rejectedBorder
+        : status === 'SUBMITTED'
+        ? colors.pendingBorder
+        : colors.missingBorder)
+    : config.border;
 
   return (
-    <View style={[styles.badge, { backgroundColor: cfg.bg }, small && styles.small]}>
-      <View style={[styles.dot, { backgroundColor: cfg.dot }]} />
-      <Text style={[styles.label, { color: cfg.color }, small && styles.labelSmall]}>
-        {cfg.label}
+    <View
+      style={[
+        styles.badge,
+        {
+          backgroundColor: badgeBg,
+          borderColor: badgeBorder,
+          paddingVertical: isSmall ? 2 : 4,
+          paddingHorizontal: isSmall ? 8 : 10,
+        },
+      ]}
+    >
+      <Ionicons
+        name={config.icon}
+        size={isSmall ? 12 : 14}
+        color={badgeColor}
+        style={styles.icon}
+      />
+      <Text
+        style={[
+          styles.text,
+          {
+            color: badgeColor,
+            fontSize: isSmall ? 10 : 12,
+          },
+        ]}
+      >
+        {config.label}
       </Text>
     </View>
   );
@@ -29,28 +78,16 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 16,
+    borderWidth: 1,
     alignSelf: 'flex-start',
   },
-  small: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  icon: {
+    marginRight: 4,
   },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  label: {
-    fontSize: 12,
+  text: {
     fontWeight: '700',
-    letterSpacing: 0.3,
     textTransform: 'uppercase',
-  },
-  labelSmall: {
-    fontSize: 10,
+    letterSpacing: 0.3,
   },
 });

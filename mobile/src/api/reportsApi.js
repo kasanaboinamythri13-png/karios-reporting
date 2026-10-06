@@ -24,7 +24,7 @@ export async function updateReport(id, payload) {
 
 export async function getReport(id) {
   const { data } = await apiClient.get(`/reports/${id}`);
-  return data;
+  return data?.report || data;
 }
 
 export async function listReports(filters = {}) {
