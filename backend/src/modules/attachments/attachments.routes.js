@@ -12,16 +12,31 @@ router.use(authenticate);
 
 // The file is the raw request body. Anything bigger than the limit is refused with 413.
 const rawFile = express.raw({
-  type: Object.keys(attachmentsService.ALLOWED_TYPES),
+  type: () => true,
   limit: attachmentsService.MAX_FILE_BYTES,
 });
 
 // POST /api/attachments  Body: the file. Headers: Content-Type (file type), X-File-Name (URI-encoded name)
 // → 201 { attachmentId, fileName, mimeType, sizeBytes }
 router.post('/', requireRole('HEAD'), rawFile, async (req, res) => {
+  const rawFileName = req.get('X-File-Name');
+  let mimeType = req.get('Content-Type')?.split(';')[0].trim();
+
+  // If MIME type is generic or missing, infer from file extension
+  if (!mimeType || !attachmentsService.ALLOWED_TYPES[mimeType]) {
+    let decodedName = rawFileName ?? '';
+    try {
+      decodedName = decodeURIComponent(decodedName);
+    } catch {}
+    const ext = decodedName.slice(decodedName.lastIndexOf('.')).toLowerCase();
+    if (ext === '.png') mimeType = 'image/png';
+    else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+    else if (ext === '.pdf') mimeType = 'application/pdf';
+  }
+
   const result = await attachmentsService.saveUpload(req.user, {
-    rawFileName: req.get('X-File-Name'),
-    mimeType: req.get('Content-Type')?.split(';')[0].trim(),
+    rawFileName,
+    mimeType,
     content: req.body,
   });
   res.status(201).json(result);
