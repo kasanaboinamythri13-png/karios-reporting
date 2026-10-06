@@ -64,7 +64,8 @@ const FORM_FIELDS = {
 
 export default function CeoReportDetailScreen({ route, navigation }) {
   const { colors, isDark } = useTheme();
-  const { reportId, department, departmentTitle } = route.params || {};
+  const { reportId, id, report_id, department, departmentTitle } = route.params || {};
+  const activeReportId = reportId || id || report_id;
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -75,20 +76,32 @@ export default function CeoReportDetailScreen({ route, navigation }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.getReport(reportId);
-      // The API returns { report: { ... } } or { ... }
-      const rep = res?.report || res?.data || res;
-      if (rep && (rep.id || rep.department || rep.status)) {
-        setReport(rep);
-      } else {
-        setError('Report not found.');
+      if (activeReportId) {
+        const res = await api.getReport(activeReportId);
+        const rep = res?.report || res?.data || res;
+        if (rep && (rep.id || rep.department || rep.status)) {
+          setReport(rep);
+          return;
+        }
       }
+
+      // Fallback: If no reportId but department is provided, check for latest report
+      if (department) {
+        const res = await api.getReports({ department });
+        const list = res?.reports || res?.data || (Array.isArray(res) ? res : []);
+        if (list.length > 0) {
+          setReport(list[0]);
+          return;
+        }
+      }
+
+      setError('Report not found.');
     } catch (err) {
       setError(err.message || 'Failed to load report from server.');
     } finally {
       setLoading(false);
     }
-  }, [reportId]);
+  }, [activeReportId, department]);
 
   useEffect(() => {
     fetchReport();
@@ -114,7 +127,8 @@ export default function CeoReportDetailScreen({ route, navigation }) {
           onPress: async () => {
             setSubmitting(true);
             try {
-              await api.reviewReport(reportId, {
+              const currentId = activeReportId || report?.id;
+              await api.reviewReport(currentId, {
                 status: decision,
                 comment: comment.trim(),
               });
@@ -150,6 +164,14 @@ export default function CeoReportDetailScreen({ route, navigation }) {
         <Header title="Report Details" onBack={() => navigation.goBack()} />
         <View style={{ padding: 20 }}>
           <ErrorBanner message={error || 'Report not found.'} onRetry={fetchReport} />
+          <TouchableOpacity
+            style={[styles.goBackBtn, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={16} color={colors.primary} />
+            <Text style={[styles.goBackBtnText, { color: colors.primary }]}>Go Back to Dashboard</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -548,5 +570,19 @@ const styles = StyleSheet.create({
   reviewedDateText: {
     fontSize: 11,
     marginTop: 6,
+  },
+  goBackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 14,
+  },
+  goBackBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

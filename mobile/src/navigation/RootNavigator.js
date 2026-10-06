@@ -21,6 +21,7 @@ import CeoReportDetailScreen from '../screens/ceo/CeoReportDetailScreen';
 import HeadTabs from './HeadTabs';
 
 // Shared Screens
+import ReportDetailScreen from '../screens/shared/ReportDetailScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import ProfileScreen from '../screens/shared/ProfileScreen';
 import { LoadingScreen } from '../components/Feedback';
@@ -134,7 +135,7 @@ export default function RootNavigator() {
         ) : (
           <>
             <Stack.Screen name="HeadApp" component={HeadTabs} />
-            <Stack.Screen name="ReportDetail" component={CeoReportDetailScreen} />
+            <Stack.Screen name="ReportDetail" component={ReportDetailScreen} />
           </>
         )}
       </Stack.Navigator>
