@@ -9,9 +9,9 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { departmentLabel } from '../../utils/roles';
 import Header from '../../components/Header';
 
 export default function ProfileScreen({ navigation }) {
@@ -35,14 +35,17 @@ export default function ProfileScreen({ navigation }) {
     );
   };
 
-  const permissions = [
-    'View All Reports',
-    'Approve Reports',
-    'Reject Reports',
-    'Dashboard Overview',
-  ];
-  const accessLevel = 'Full Admin Access — All Departments';
-  const initial = 'C';
+  const isCeo = user?.role === 'CEO';
+  const roleDisplay = isCeo ? 'CEO' : (user?.title || `${departmentLabel(user?.department)} Head`);
+  const accessLevel = isCeo
+    ? 'Full Admin Access — All Departments'
+    : `${departmentLabel(user?.department)} Department Lead`;
+
+  const permissions = isCeo
+    ? ['View All Reports', 'Approve Reports', 'Reject Reports', 'Dashboard Overview']
+    : ['Submit Daily Reports', 'View Department History', 'Upload Attachments', 'Receive Review Alerts'];
+
+  const initial = (user?.name || user?.email || 'User').charAt(0).toUpperCase();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -53,8 +56,7 @@ export default function ProfileScreen({ navigation }) {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-
-        {/* ── Exact Web App Profile Card ── */}
+        {/* Profile Card */}
         <View style={[styles.profileCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
           {/* Avatar & Header */}
           <View style={styles.avatarContainer}>
@@ -62,10 +64,10 @@ export default function ProfileScreen({ navigation }) {
               <Text style={styles.avatarInitial}>{initial}</Text>
             </View>
             <Text style={[styles.profileRoleTitle, { color: colors.text }]}>
-              {user?.role || 'CEO'}
+              {roleDisplay}
             </Text>
             <Text style={[styles.profileEmail, { color: colors.textMuted }]}>
-              {user?.email || 'ceo@karios.local'}
+              {user?.email || 'user@karios.local'}
             </Text>
           </View>
 
@@ -75,8 +77,15 @@ export default function ProfileScreen({ navigation }) {
           {/* Role Section */}
           <View style={styles.sectionBlock}>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Role</Text>
-            <Text style={[styles.sectionValue, { color: colors.text }]}>{user?.role || 'CEO'}</Text>
+            <Text style={[styles.sectionValue, { color: colors.text }]}>{user?.role || 'Member'}</Text>
           </View>
+
+          {user?.department && (
+            <View style={styles.sectionBlock}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Department</Text>
+              <Text style={[styles.sectionValue, { color: colors.text }]}>{departmentLabel(user.department)}</Text>
+            </View>
+          )}
 
           {/* Access Level Section */}
           <View style={styles.sectionBlock}>
@@ -115,7 +124,7 @@ export default function ProfileScreen({ navigation }) {
           {/* Divider */}
           <View style={[styles.divider, { backgroundColor: colors.surfaceBorder }]} />
 
-          {/* Sign Out Button */}
+          {/* Sign Out Button (exact soft-tinted red outline style) */}
           <TouchableOpacity
             style={[
               styles.signOutButton,
@@ -137,7 +146,6 @@ export default function ProfileScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -152,9 +160,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 14,
   },
-
-
-  // ── Profile Card ──
   profileCard: {
     borderRadius: 16,
     paddingHorizontal: 20,

@@ -7,7 +7,7 @@ export const DEPARTMENT_LABELS = {
   SALES: 'Sales',
   MARKETING: 'Marketing',
   FINANCE: 'Finance',
-  EXECUTIVE: 'Executive',
+  EXECUTIVE: 'CEO',
 };
 
 export const departmentLabel = (department) => DEPARTMENT_LABELS[department] || department || '—';

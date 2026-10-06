@@ -5,11 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { STATUS_CONFIG } from '../utils/roles';
 import { useTheme } from '../context/ThemeContext';
 
-export default function StatusBadge({ status, size = 'medium' }) {
+export default function StatusBadge({ status, size = 'medium', small = false }) {
   const { colors, isDark } = useTheme();
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.NOT_SUBMITTED;
 
-  const isSmall = size === 'small';
+  const isSmall = size === 'small' || small === true;
 
   const badgeColor = isDark
     ? (status === 'APPROVED'

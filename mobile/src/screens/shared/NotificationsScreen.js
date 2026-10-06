@@ -11,40 +11,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { colors } from '../../theme/colors';
 import { formatDateTime } from '../../utils/date';
 import Header from '../../components/Header';
 import { LoadingScreen, EmptyState } from '../../components/Feedback';
 
-const MOCK_NOTIFICATIONS = [
-  {
-    id: 'notif-1',
-    title: 'Report Approved',
-    body: 'The CEO approved your Development Daily Report.',
-    is_read: false,
-    report_id: 'demo-report-dev',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'notif-2',
-    title: 'New Daily Submission',
-    body: 'Sales department submitted their daily report.',
-    is_read: false,
-    report_id: 'demo-report-sales',
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: 'notif-3',
-    title: 'Report Rejected',
-    body: 'Your Marketing report was returned for revision: "Need campaign budget breakout".',
-    is_read: true,
-    report_id: 'demo-report-mktg',
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-  },
-];
-
 export default function NotificationsScreen({ navigation }) {
+  const { user } = useAuth();
   const { colors, isDark } = useTheme();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,9 +29,9 @@ export default function NotificationsScreen({ navigation }) {
     try {
       const res = await api.getNotifications();
       const list = res?.notifications || res?.data || res || [];
-      setNotifications(Array.isArray(list) && list.length > 0 ? list : MOCK_NOTIFICATIONS);
+      setNotifications(Array.isArray(list) ? list : []);
     } catch {
-      setNotifications(MOCK_NOTIFICATIONS);
+      setNotifications([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -91,9 +65,12 @@ export default function NotificationsScreen({ navigation }) {
     }
 
     if (item.report_id) {
-      navigation.navigate('CeoReportDetail', {
-        reportId: item.report_id,
-      });
+      const targetScreen = user?.role === 'CEO' ? 'CeoReportDetail' : 'ReportDetail';
+      try {
+        navigation.navigate(targetScreen, { reportId: item.report_id });
+      } catch {
+        navigation.navigate('CeoReportDetail', { reportId: item.report_id });
+      }
     }
   };
 
@@ -201,18 +178,17 @@ export default function NotificationsScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   markReadBtn: {
     paddingVertical: 4,
     paddingHorizontal: 10,
-    backgroundColor: colors.surfaceHover,
+    backgroundColor: 'rgba(124, 58, 237, 0.08)',
     borderRadius: 6,
   },
   markReadText: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.primary,
+    color: '#7c3aed',
   },
   listContent: {
     padding: 16,
@@ -221,20 +197,15 @@ const styles = StyleSheet.create({
   itemCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
     shadowRadius: 3,
     elevation: 1,
   },
   itemCardUnread: {
-    backgroundColor: '#ffffff',
-    borderColor: colors.primaryLight,
     borderWidth: 1.5,
   },
   iconCol: {
@@ -248,7 +219,6 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 4.5,
-    backgroundColor: colors.primary,
   },
   contentCol: {
     flex: 1,
@@ -256,22 +226,18 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     fontSize: 14,
-    color: colors.text,
     fontWeight: '600',
   },
   itemTitleBold: {
     fontWeight: '800',
-    color: colors.text,
   },
   itemBody: {
     fontSize: 13,
-    color: colors.textMuted,
     marginTop: 2,
     lineHeight: 18,
   },
   itemTime: {
     fontSize: 11,
-    color: colors.textLight,
     marginTop: 4,
   },
 });

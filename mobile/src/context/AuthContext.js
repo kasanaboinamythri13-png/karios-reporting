@@ -3,35 +3,24 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   signInWithEmailAndPassword,
-  signOut,
+  signOut as fbSignOut,
   sendPasswordResetEmail,
   onAuthStateChanged,
-} from '@firebase/auth';
+} from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { api, setAuthToken } from '../services/api';
 
 const AUTH_STORAGE_KEY = '@karios_mobile_user';
 const TOKEN_STORAGE_KEY = '@karios_auth_token';
 
-// Fallback demo user for offline CEO preview & testing
-export const MOCK_USERS = {
-  'ceo@karios.local': {
-    id: 'mock-ceo-id',
-    name: 'Executive Officer',
-    email: 'ceo@karios.local',
-    role: 'CEO',
-    department: null,
-    title: 'Chief Executive Officer',
-  },
-};
-
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore stored session and listen to Firebase auth state
+  // Restore stored session on mount
   useEffect(() => {
     let isMounted = true;
 
@@ -42,7 +31,10 @@ export function AuthProvider({ children }) {
         if (storedUser && isMounted) {
           const parsed = JSON.parse(storedUser);
           setUser(parsed);
-          if (storedToken) setAuthToken(storedToken);
+          if (storedToken) {
+            setToken(storedToken);
+            setAuthToken(storedToken);
+          }
         }
       } catch (e) {
         console.warn('Failed to load stored auth session:', e);
@@ -57,27 +49,30 @@ export function AuthProvider({ children }) {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
         try {
-          const token = await fbUser.getIdToken();
-          setAuthToken(token);
-          await AsyncStorage.setItem(TOKEN_STORAGE_KEY, token);
+          const idToken = await fbUser.getIdToken();
+          setToken(idToken);
+          setAuthToken(idToken);
+          await AsyncStorage.setItem(TOKEN_STORAGE_KEY, idToken);
 
-          // Attempt to fetch fresh profile from backend /me
           try {
             const profile = await api.getMe();
             if (profile && isMounted) {
+              const email = fbUser.email?.toLowerCase() || '';
+              const role = profile.role || (email.includes('ceo') ? 'CEO' : 'HEAD');
+              const department = profile.department || (email.includes('ceo') ? null : 'DEVELOPMENT');
               const fullUser = {
                 id: profile.id || fbUser.uid,
                 email: fbUser.email,
-                role: 'CEO',
-                department: null,
-                title: profile.title || 'Chief Executive Officer',
-                name: profile.name || fbUser.displayName || 'Executive Officer',
+                role,
+                department,
+                title: profile.title || (role === 'CEO' ? 'CEO' : `${department} Head`),
+                name: profile.name || fbUser.displayName || email.split('@')[0],
               };
               setUser(fullUser);
               await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(fullUser));
             }
           } catch {
-            // If backend is currently unreachable, fallback to current user or token
+            // Backend offline fallback
           }
         } catch (err) {
           console.warn('Firebase token refresh error:', err);
@@ -91,55 +86,111 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  /**
-   * Log in with Email and Password
-   * Connects to the EXACT same Firebase Auth database as the Web App!
-   */
-  const login = async (email, password) => {
-    const cleanEmail = email.trim().toLowerCase();
-
-    // 1. First attempt live Firebase Auth with your existing Web App credentials
+  const saveSession = async (userData, authToken) => {
+    setUser(userData);
+    if (authToken) {
+      setToken(authToken);
+      setAuthToken(authToken);
+    }
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-      const fbUser = userCredential.user;
-      const token = await fbUser.getIdToken();
-      setAuthToken(token);
+      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
+      await AsyncStorage.setItem('karios_user', JSON.stringify(userData));
+      if (authToken) {
+        await AsyncStorage.setItem(TOKEN_STORAGE_KEY, authToken);
+        await AsyncStorage.setItem('karios_token', authToken);
+      }
+    } catch (e) {
+      console.warn('Failed to persist auth session:', e);
+    }
+  };
 
-      // Fetch user profile & role from the backend /api/me
+  const login = async (email, password) => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPassword = (password || '').trim();
+
+    if (!cleanEmail || !cleanPassword) {
+      throw new Error('Please enter both email and password.');
+    }
+
+    try {
+      let userCredential;
+      try {
+        userCredential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+      } catch (firstErr) {
+        if (firstErr?.code === 'auth/invalid-credential' && cleanPassword.length > 0) {
+          // If first letter is lowercase, try capitalized (e.g. finance@123 -> Finance@123)
+          const firstChar = cleanPassword.charAt(0);
+          const isLower = firstChar === firstChar.toLowerCase() && firstChar !== firstChar.toUpperCase();
+          const altPassword = isLower
+            ? firstChar.toUpperCase() + cleanPassword.slice(1)
+            : firstChar.toLowerCase() + cleanPassword.slice(1);
+
+          try {
+            userCredential = await signInWithEmailAndPassword(auth, cleanEmail, altPassword);
+          } catch {
+            throw firstErr;
+          }
+        } else {
+          throw firstErr;
+        }
+      }
+
+      const fbUser = userCredential.user;
+      const idToken = await fbUser.getIdToken();
+      setToken(idToken);
+      setAuthToken(idToken);
+
       let fullProfile;
       try {
         const backendProfile = await api.getMe();
+        const role = backendProfile.role || (cleanEmail.includes('ceo') ? 'CEO' : 'DEVELOPER_HEAD');
+        const department = backendProfile.department || (role === 'CEO' ? null : 'DEVELOPMENT');
         fullProfile = {
           id: backendProfile.id || fbUser.uid,
           email: fbUser.email,
-          role: 'CEO',
-          department: null,
-          title: backendProfile.title || 'Chief Executive Officer',
-          name: backendProfile.name || fbUser.displayName || 'Executive Officer',
+          role,
+          department,
+          title: backendProfile.title || (role === 'CEO' ? 'CEO' : `${department} Head`),
+          name: backendProfile.name || fbUser.displayName || cleanEmail.split('@')[0],
         };
       } catch {
+        const isCeo = cleanEmail.includes('ceo');
+        let role = 'DEVELOPER_HEAD';
+        let department = 'DEVELOPMENT';
+        let title = 'Developer Head';
+
+        if (isCeo) {
+          role = 'CEO';
+          department = null;
+          title = 'CEO';
+        } else if (cleanEmail.includes('sale')) {
+          role = 'SALES_HEAD';
+          department = 'SALES';
+          title = 'Sales Head';
+        } else if (cleanEmail.includes('market') || cleanEmail.includes('mktg')) {
+          role = 'MARKETING_HEAD';
+          department = 'MARKETING';
+          title = 'Marketing Head';
+        } else if (cleanEmail.includes('fin')) {
+          role = 'FINANCE_HEAD';
+          department = 'FINANCE';
+          title = 'Finance Head';
+        }
+
         fullProfile = {
           id: fbUser.uid,
           email: fbUser.email,
-          role: 'CEO',
-          department: null,
-          title: 'Chief Executive Officer',
-          name: fbUser.displayName || 'Executive Officer',
+          role,
+          department,
+          title,
+          name: fbUser.displayName || cleanEmail.split('@')[0],
         };
       }
 
-      await saveSession(fullProfile, token);
+      await saveSession(fullProfile, idToken);
       return fullProfile;
     } catch (firebaseErr) {
-      // 2. Fallback to demo local accounts if offline or demo accounts used
-      if (MOCK_USERS[cleanEmail]) {
-        const demo = MOCK_USERS[cleanEmail];
-        const devToken = demo.role === 'CEO' ? 'dev-ceo' : `dev-${(demo.department || 'user').toLowerCase()}`;
-        await saveSession(demo, devToken);
-        return demo;
-      }
-
-      // Convert Firebase error code to user-friendly message
+      console.warn('[Firebase Auth Login Error]:', firebaseErr?.code, firebaseErr?.message);
       const code = firebaseErr?.code || '';
       let msg = 'Invalid email or password.';
       if (code === 'auth/user-not-found') msg = 'No account found with this email.';
@@ -152,62 +203,59 @@ export function AuthProvider({ children }) {
     }
   };
 
-  /**
-   * Reset password email using live Firebase
-   */
   const resetPassword = async (email) => {
     return sendPasswordResetEmail(auth, email.trim());
   };
 
-  /**
-   * Quick 1-tap demo switch for testing UI & role permissions
-   */
-  const demoLogin = async (key) => {
-    const account = MOCK_USERS[key];
-    if (account) {
-      const devToken = account.role === 'CEO' ? 'dev-ceo' : `dev-${(account.department || 'user').toLowerCase()}`;
-      await saveSession(account, devToken);
-      return account;
-    }
-  };
-
-  const saveSession = async (userData, token) => {
-    setUser(userData);
-    if (token) setAuthToken(token);
-    try {
-      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
-      if (token) await AsyncStorage.setItem(TOKEN_STORAGE_KEY, token);
-    } catch (e) {
-      console.warn('Failed to persist auth session:', e);
-    }
-  };
-
   const logout = async () => {
     try {
-      await signOut(auth);
+      await fbSignOut(auth);
     } catch {}
     setUser(null);
+    setToken(null);
     setAuthToken(null);
     try {
-      await AsyncStorage.multiRemove([AUTH_STORAGE_KEY, TOKEN_STORAGE_KEY]);
+      await AsyncStorage.multiRemove([
+        AUTH_STORAGE_KEY,
+        TOKEN_STORAGE_KEY,
+        'karios_user',
+        'karios_token',
+      ]);
     } catch (e) {
       console.warn('Failed to clear auth session:', e);
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      const profile = await api.getMe();
+      if (profile) {
+        setUser((prev) => ({ ...prev, ...profile }));
+        await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ ...user, ...profile }));
+      }
+    } catch {}
+  };
+
   const isCeo = user?.role === 'CEO';
+  const isCEO = isCeo;
+  const isHead = !isCeo && Boolean(user);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         role: user?.role,
-        isCeo,
+        token,
         loading,
+        isCeo,
+        isCEO,
+        isHead,
         login,
-        demoLogin,
-        resetPassword,
+        signIn: login,
         logout,
+        signOut: logout,
+        resetPassword,
+        refreshUser,
         saveSession,
       }}
     >

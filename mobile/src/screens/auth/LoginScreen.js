@@ -18,7 +18,7 @@ import { colors } from '../../theme/colors';
 import KariosLogo from '../../components/KariosLogo';
 
 export default function LoginScreen() {
-  const { login, demoLogin } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -61,18 +61,6 @@ export default function LoginScreen() {
     }, 800);
   };
 
-  const handleQuickDemo = async (demoEmail) => {
-    setLoading(true);
-    setError(null);
-    try {
-      await demoLogin(demoEmail);
-    } catch (err) {
-      setError(err.message || 'Demo login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -85,9 +73,9 @@ export default function LoginScreen() {
         >
           {/* Card Container strictly styled like web .login-card */}
           <View style={styles.loginCard}>
-            {/* Exact Web Logo Format */}
+            {/* Web Logo Format */}
             <View style={styles.logoWrapper}>
-              <KariosLogo size={52} subtitle="REPORTING" showTagline={true} />
+              <KariosLogo size={46} subtitle="REPORTING" showTagline={true} />
             </View>
 
             {error ? (
@@ -251,24 +239,6 @@ export default function LoginScreen() {
               Access is by invitation only. Contact your administrator.
             </Text>
           </View>
-
-          {/* Quick Demo Access (CEO Role Only) */}
-          <View style={styles.quickTestSection}>
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerLabel}>DEMO ACCESS</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <View style={styles.rolesRow}>
-              <TouchableOpacity
-                style={[styles.roleBadge, styles.roleBadgeCeo, { flex: 1, alignItems: 'center', justifyContent: 'center' }]}
-                onPress={() => handleQuickDemo('ceo@karios.local')}
-              >
-                <Text style={styles.roleBadgeTextCeo}>Quick CEO Access</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -278,7 +248,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background, // Matches web --color-bg: #f0f0f7
+    backgroundColor: colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -359,7 +329,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   primaryButton: {
-    backgroundColor: colors.primary, // Matches web --color-primary: #7c3aed
+    backgroundColor: colors.primary,
     height: 44,
     borderRadius: 8,
     alignItems: 'center',
@@ -425,12 +395,12 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   quickTestSection: {
-    marginTop: 24,
+    marginTop: 20,
   },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   dividerLine: {
     flex: 1,
@@ -451,7 +421,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   roleBadge: {
-    paddingVertical: 6,
+    paddingVertical: 7,
     paddingHorizontal: 12,
     backgroundColor: colors.surface,
     borderRadius: 16,

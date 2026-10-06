@@ -3,6 +3,18 @@
 # dependencies
 node_modules/
 
+# Android build artifacts
+android/.gradle/
+android/app/build/
+android/build/
+*.apk
+*.aab
+*.keystore
+
+# Environment secrets
+.env
+.env.local
+
 # Expo
 .expo/
 dist/

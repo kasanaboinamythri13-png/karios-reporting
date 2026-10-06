@@ -1,3 +1,4 @@
+// mobile/App.js
 import React from 'react';
 import { LogBox } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -29,4 +30,3 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-

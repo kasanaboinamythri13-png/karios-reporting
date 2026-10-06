@@ -1,6 +1,6 @@
-// mobile/src/services/firebase.js
-import { initializeApp, getApps, getApp } from '@firebase/app';
-import { getAuth } from '@firebase/auth';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeAuth, getReactNativePersistence, getAuth } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * EXACT Firebase Project Configuration matching Web App:
@@ -18,6 +18,16 @@ export const firebaseConfig = {
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Auth
-export const auth = getAuth(app);
+// Initialize Auth with React Native persistence
+let auth;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+} catch (e) {
+  auth = getAuth(app);
+}
+
+export { auth };
 export default app;
+

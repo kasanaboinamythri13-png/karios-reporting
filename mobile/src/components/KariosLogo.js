@@ -6,6 +6,8 @@ import { colors as defaultColors } from '../theme/colors';
 
 export default function KariosLogo({
   size = 36,
+  width,
+  height,
   subtitle = 'REPORTING',
   showTagline = false,
   textColor,
@@ -22,17 +24,18 @@ export default function KariosLogo({
     // fallback if used outside ThemeProvider
   }
 
+  const effectiveSize = height || size || 36;
   const computedTitleColor = textColor || (isDarkMode ? '#ffffff' : themeColors.text);
   const computedSubtitleColor = subtitleColor || (isDarkMode ? '#8b949e' : themeColors.textMuted);
-  const titleSize = Math.round(size * 0.62);
-  const subSize = Math.max(9, Math.round(size * 0.28));
+  const titleSize = Math.round(effectiveSize * 0.62);
+  const subSize = Math.max(9, Math.round(effectiveSize * 0.28));
 
   return (
     <View style={[styles.container, align === 'left' && styles.alignLeft]}>
       <View style={styles.brandRow}>
         <Image
           source={require('../../assets/karios-symbol.png')}
-          style={{ width: size, height: size }}
+          style={{ width: effectiveSize, height: effectiveSize }}
           resizeMode="contain"
         />
         <View style={styles.textCol}>

@@ -2,9 +2,9 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
-import { lightColors, darkColors } from '../theme/colors';
+import { lightColors, darkColors, LightColors, DarkColors } from '../theme/colors';
 
-const STORAGE_KEY = '@karios_ceo_theme';
+const THEME_STORAGE_KEY = '@karios_theme';
 
 const ThemeContext = createContext({
   theme: 'light',
@@ -17,16 +17,16 @@ const ThemeContext = createContext({
 
 export function ThemeProvider({ children }) {
   const { user } = useAuth();
-  const [ceoThemePreference, setCeoThemePreference] = useState('light');
+  const [themePreference, setThemePreference] = useState('light');
 
-  // Load saved CEO theme on mount
+  // Load saved theme on mount
   useEffect(() => {
     let isMounted = true;
     (async () => {
       try {
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
+        const saved = await AsyncStorage.getItem(THEME_STORAGE_KEY);
         if (isMounted && (saved === 'dark' || saved === 'light')) {
-          setCeoThemePreference(saved);
+          setThemePreference(saved);
         }
       } catch {}
     })();
@@ -35,35 +35,34 @@ export function ThemeProvider({ children }) {
     };
   }, []);
 
-  const changeTheme = async (newTheme) => {
-    if (newTheme !== 'dark' && newTheme !== 'light') return;
-    setCeoThemePreference(newTheme);
+  const changeTheme = async (nextTheme) => {
+    const val = nextTheme === 'dark' ? 'dark' : 'light';
+    setThemePreference(val);
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, newTheme);
+      await AsyncStorage.setItem(THEME_STORAGE_KEY, val);
     } catch {}
   };
 
   const toggleTheme = () => {
-    changeTheme(ceoThemePreference === 'light' ? 'dark' : 'light');
+    changeTheme(themePreference === 'light' ? 'dark' : 'light');
   };
 
-  // Rule: Dark theme is ONLY available for CEO role; Department Heads always stay in Light theme
+  // Rule: Dark theme is available for CEO; Department Heads stay in Light theme
   const isCeoRole = user?.role === 'CEO';
-  const effectiveTheme = isCeoRole ? ceoThemePreference : 'light';
+  const effectiveTheme = isCeoRole ? themePreference : 'light';
   const isDark = effectiveTheme === 'dark';
   const activeColors = isDark ? darkColors : lightColors;
 
   const value = useMemo(
     () => ({
       theme: effectiveTheme,
-      ceoThemePreference,
       isDark,
       colors: activeColors,
       setTheme: changeTheme,
       toggleTheme,
       isCeoRole,
     }),
-    [effectiveTheme, ceoThemePreference, isDark, activeColors, isCeoRole]
+    [effectiveTheme, isDark, activeColors, isCeoRole]
   );
 
   return (
@@ -73,4 +72,19 @@ export function ThemeProvider({ children }) {
   );
 }
 
-export const useTheme = () => useContext(ThemeContext);
+export function useTheme() {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) {
+    return {
+      theme: 'light',
+      isDark: false,
+      colors: LightColors,
+      toggleTheme: () => {},
+      setTheme: () => {},
+      isCeoRole: false,
+    };
+  }
+  return ctx;
+}
+
+export default ThemeContext;

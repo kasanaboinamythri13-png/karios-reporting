@@ -17,7 +17,10 @@ import CeoOverviewScreen from '../screens/ceo/CeoOverviewScreen';
 import CeoReportsScreen from '../screens/ceo/CeoReportsScreen';
 import CeoReportDetailScreen from '../screens/ceo/CeoReportDetailScreen';
 
-// Shared CEO Screens
+// Department Head Navigator (from teammate)
+import HeadTabs from './HeadTabs';
+
+// Shared Screens
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import ProfileScreen from '../screens/shared/ProfileScreen';
 import { LoadingScreen } from '../components/Feedback';
@@ -115,15 +118,22 @@ export default function RootNavigator() {
       }
     : DefaultTheme;
 
+  const isCeo = user?.role === 'CEO';
+
   return (
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
         {!user ? (
           <Stack.Screen name="Login" component={LoginScreen} />
-        ) : (
+        ) : isCeo ? (
           <>
             <Stack.Screen name="CeoMain" component={CeoTabNavigator} />
             <Stack.Screen name="CeoReportDetail" component={CeoReportDetailScreen} />
+            <Stack.Screen name="ReportDetail" component={CeoReportDetailScreen} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="HeadApp" component={HeadTabs} />
             <Stack.Screen name="ReportDetail" component={CeoReportDetailScreen} />
           </>
         )}

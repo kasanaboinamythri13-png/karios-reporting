@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  Image,
   ScrollView,
   RefreshControl,
   TouchableOpacity,
@@ -22,46 +21,6 @@ import StatusBadge from '../../components/StatusBadge';
 import KariosLogo from '../../components/KariosLogo';
 import { LoadingScreen, ErrorBanner } from '../../components/Feedback';
 
-const DEFAULT_OVERVIEW = {
-  date: getTodayISODate(),
-  summary: {
-    totalDepartments: 4,
-    submittedCount: 3,
-    approvedCount: 1,
-    rejectedCount: 0,
-  },
-  departments: [
-    {
-      department: 'DEVELOPMENT',
-      title: 'Development Head',
-      status: 'SUBMITTED',
-      submittedAt: new Date().toISOString(),
-      reportId: 'demo-report-dev',
-    },
-    {
-      department: 'SALES',
-      title: 'Sales Head',
-      status: 'APPROVED',
-      submittedAt: new Date(Date.now() - 3600000).toISOString(),
-      reportId: 'demo-report-sales',
-    },
-    {
-      department: 'MARKETING',
-      title: 'Marketing Head',
-      status: 'SUBMITTED',
-      submittedAt: new Date(Date.now() - 7200000).toISOString(),
-      reportId: 'demo-report-mktg',
-    },
-    {
-      department: 'FINANCE',
-      title: 'Finance Head',
-      status: 'MISSING',
-      submittedAt: null,
-      reportId: null,
-    },
-  ],
-};
-
 export default function CeoOverviewScreen({ navigation }) {
   const { colors, isDark, toggleTheme } = useTheme();
   const [date, setDate] = useState(getTodayISODate());
@@ -79,7 +38,8 @@ export default function CeoOverviewScreen({ navigation }) {
         const overviewData = res?.data || res;
         setData(overviewData);
       } catch (err) {
-        setData(DEFAULT_OVERVIEW);
+        setError(err.message || 'Cannot load live CEO overview from server.');
+        setData(null);
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -98,17 +58,22 @@ export default function CeoOverviewScreen({ navigation }) {
   };
 
   if (loading && !refreshing) {
-    return <LoadingScreen message="Loading Executive Dashboard..." />;
+    return <LoadingScreen message="Loading CEO Dashboard..." />;
   }
 
-  const summary = data?.summary || DEFAULT_OVERVIEW.summary;
+  const summary = data?.summary || {
+    totalDepartments: 0,
+    submittedCount: 0,
+    approvedCount: 0,
+    rejectedCount: 0,
+  };
   const pendingCount = Math.max(
     0,
     (summary.submittedCount || 0) -
       (summary.approvedCount || 0) -
       (summary.rejectedCount || 0)
   );
-  const departments = data?.departments || DEFAULT_OVERVIEW.departments;
+  const departments = data?.departments || [];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -316,10 +281,6 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 8 : 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-  },
-  brandLogo: {
-    width: 130,
-    height: 36,
   },
   quickThemeBtn: {
     width: 38,

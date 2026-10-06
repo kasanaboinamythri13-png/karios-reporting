@@ -2,6 +2,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, USE_MOCK_DATA } from '../config/api.config';
 
+import { auth } from './firebase';
+
 let authToken = null;
 
 export const setAuthToken = (token) => {
@@ -11,7 +13,10 @@ export const setAuthToken = (token) => {
 export const getStoredAuthToken = async () => {
   if (authToken) return authToken;
   try {
-    const token = await AsyncStorage.getItem('@karios_auth_token');
+    let token = (await AsyncStorage.getItem('@karios_auth_token')) || (await AsyncStorage.getItem('karios_token'));
+    if (!token && auth?.currentUser) {
+      token = await auth.currentUser.getIdToken();
+    }
     authToken = token;
     return token;
   } catch {
@@ -87,7 +92,14 @@ export const api = {
     const qs = query.toString();
     return request(`/reports${qs ? `?${qs}` : ''}`);
   },
-  getReportById: (id) => request(`/reports/${encodeURIComponent(id)}`),
+  getReport: async (id) => {
+    const res = await request(`/reports/${encodeURIComponent(id)}`);
+    return res?.report || res;
+  },
+  getReportById: async (id) => {
+    const res = await request(`/reports/${encodeURIComponent(id)}`);
+    return res?.report || res;
+  },
   submitReport: (body) => request('/reports', { method: 'POST', body }),
   updateReport: (id, body) => request(`/reports/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
   reviewReport: (id, { status, comment }) =>

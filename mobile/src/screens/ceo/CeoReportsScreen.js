@@ -70,73 +70,6 @@ const formatReportTime = (dateStr) => {
   }
 };
 
-const MOCK_REPORTS = [
-  {
-    id: 'demo-report-dev-1',
-    department: 'DEVELOPMENT',
-    head_title: 'Development Head',
-    report_date: '2026-10-05',
-    status: 'SUBMITTED',
-    created_at: '2026-10-05T18:09:00.000Z',
-  },
-  {
-    id: 'demo-report-sales-1',
-    department: 'SALES',
-    head_title: 'Sales Head',
-    report_date: '2026-10-04',
-    status: 'APPROVED',
-    created_at: '2026-10-04T17:30:00.000Z',
-  },
-  {
-    id: 'demo-report-mktg-1',
-    department: 'MARKETING',
-    head_title: 'Marketing Head',
-    report_date: '2026-10-04',
-    status: 'SUBMITTED',
-    created_at: '2026-10-04T16:03:00.000Z',
-  },
-  {
-    id: 'demo-report-fin-1',
-    department: 'FINANCE',
-    head_title: 'Finance Head',
-    report_date: '2026-10-03',
-    status: 'REJECTED',
-    created_at: '2026-10-03T18:09:00.000Z',
-  },
-  {
-    id: 'demo-report-dev-2',
-    department: 'DEVELOPMENT',
-    head_title: 'Development Head',
-    report_date: '2026-10-03',
-    status: 'APPROVED',
-    created_at: '2026-10-03T14:15:00.000Z',
-  },
-  {
-    id: 'demo-report-sales-2',
-    department: 'SALES',
-    head_title: 'Sales Head',
-    report_date: '2026-10-02',
-    status: 'APPROVED',
-    created_at: '2026-10-02T16:45:00.000Z',
-  },
-  {
-    id: 'demo-report-mktg-2',
-    department: 'MARKETING',
-    head_title: 'Marketing Head',
-    report_date: '2026-10-01',
-    status: 'APPROVED',
-    created_at: '2026-10-01T15:20:00.000Z',
-  },
-  {
-    id: 'demo-report-fin-2',
-    department: 'FINANCE',
-    head_title: 'Finance Head',
-    report_date: '2026-10-01',
-    status: 'REJECTED',
-    created_at: '2026-10-01T17:10:00.000Z',
-  },
-];
-
 export default function CeoReportsScreen({ navigation }) {
   const { colors, isDark } = useTheme();
   const [filter, setFilter] = useState('ALL');
@@ -168,9 +101,9 @@ export default function CeoReportsScreen({ navigation }) {
 
       const res = await api.getReports(params);
       const data = res?.data || res?.reports || res || [];
-      setRawReports(Array.isArray(data) && data.length > 0 ? data : MOCK_REPORTS);
+      setRawReports(Array.isArray(data) ? data : []);
     } catch {
-      setRawReports(MOCK_REPORTS);
+      setRawReports([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
