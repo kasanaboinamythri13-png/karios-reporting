@@ -14,10 +14,11 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { departmentLabel } from '../../utils/roles';
 import Header from '../../components/Header';
+import ThemeToggleBtn from '../../components/ThemeToggleBtn';
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
-  const { isDark, colors, toggleTheme } = useTheme();
+  const { isDark, colors } = useTheme();
 
   const handleLogout = () => {
     Alert.alert(
@@ -39,12 +40,121 @@ export default function ProfileScreen({ navigation }) {
   const isCeo = user?.role === 'CEO';
   const roleDisplay = isCeo ? 'CEO' : (user?.title || `${departmentLabel(user?.department)} Head`);
 
+  if (isCeo) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header
+          title="Profile"
+          subtitle="Account settings & permissions"
+          rightAction={<ThemeToggleBtn size={38} />}
+        />
+
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View
+            style={[
+              styles.profileCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.surfaceBorder,
+              },
+            ]}
+          >
+            {/* Avatar & Header */}
+            <View style={styles.avatarContainer}>
+              <View
+                style={[
+                  styles.avatarCircle,
+                  {
+                    backgroundColor: colors.primary,
+                  },
+                ]}
+              >
+                <Text style={styles.avatarText}>C</Text>
+              </View>
+              <Text style={[styles.userName, { color: colors.text }]}>CEO</Text>
+              <Text style={[styles.userEmail, { color: colors.textMuted }]}>
+                {user?.email || 'ceo@karios.com'}
+              </Text>
+            </View>
+
+            {/* Divider */}
+            <View style={[styles.cardDivider, { backgroundColor: colors.surfaceBorder }]} />
+
+            {/* Role */}
+            <View style={styles.ceoFieldGroup}>
+              <Text style={[styles.ceoFieldLabel, { color: colors.textMuted }]}>Role</Text>
+              <Text style={[styles.ceoFieldValue, { color: colors.text }]}>CEO</Text>
+            </View>
+
+            {/* Access Level */}
+            <View style={styles.ceoFieldGroup}>
+              <Text style={[styles.ceoFieldLabel, { color: colors.textMuted }]}>Access Level</Text>
+              <Text style={[styles.ceoFieldValue, { color: colors.text }]}>
+                Full Admin Access — All Departments
+              </Text>
+            </View>
+
+            {/* Permissions */}
+            <View style={styles.ceoFieldGroup}>
+              <Text style={[styles.ceoFieldLabel, { color: colors.textMuted }]}>Permissions</Text>
+              <View style={styles.permissionsGrid}>
+                {['View All Reports', 'Approve Reports', 'Reject Reports', 'Dashboard Overview'].map(
+                  (perm) => (
+                    <View
+                      key={perm}
+                      style={[
+                        styles.permPill,
+                        {
+                          backgroundColor: isDark ? 'rgba(167, 139, 250, 0.15)' : '#f3e8ff',
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.permPillText, { color: colors.primary }]}>{perm}</Text>
+                    </View>
+                  )
+                )}
+              </View>
+            </View>
+
+            {/* Divider */}
+            <View style={[styles.cardDivider, { backgroundColor: colors.surfaceBorder }]} />
+
+            {/* Sign Out Button (Styled like 2nd image) */}
+            <TouchableOpacity
+              style={[
+                styles.signOutButton,
+                {
+                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#fee2e2',
+                  borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#fca5a5',
+                },
+              ]}
+              onPress={handleLogout}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.signOutButtonText,
+                  { color: isDark ? '#f87171' : '#dc2626' },
+                ]}
+              >
+                Sign Out
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Header title="Account" />
+      <Header
+        title="Account"
+        rightAction={<ThemeToggleBtn size={38} />}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile Card */}
+        {/* Single Unified Card for Department Head */}
         <View
           style={[
             styles.profileCard,
@@ -55,6 +165,7 @@ export default function ProfileScreen({ navigation }) {
             },
           ]}
         >
+          {/* Avatar & Header */}
           <View style={styles.avatarContainer}>
             <View
               style={[
@@ -65,33 +176,21 @@ export default function ProfileScreen({ navigation }) {
               ]}
             >
               <Text style={styles.avatarText}>
-                {user?.name ? user.name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase() || 'U'}
+                {roleDisplay ? roleDisplay.charAt(0).toUpperCase() : (user?.email?.charAt(0) || 'U').toUpperCase()}
               </Text>
             </View>
             <Text style={[styles.userName, { color: colors.text }]}>
-              {user?.name || roleDisplay}
+              {roleDisplay}
             </Text>
             <Text style={[styles.userEmail, { color: colors.textMuted }]}>
               {user?.email}
             </Text>
-            <View style={[styles.roleBadge, { backgroundColor: isDark ? '#2d244a' : '#f3e8ff' }]}>
-              <Text style={[styles.roleBadgeText, { color: colors.primary }]}>
-                {roleDisplay}
-              </Text>
-            </View>
           </View>
-        </View>
 
-        {/* Details Card */}
-        <View
-          style={[
-            styles.sectionCard,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.surfaceBorder,
-            },
-          ]}
-        >
+          {/* Light Line Divider */}
+          <View style={[styles.cardDivider, { backgroundColor: colors.surfaceBorder }]} />
+
+          {/* Organization Info Section */}
           <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
             ORGANIZATION INFO
           </Text>
@@ -106,7 +205,7 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.infoRow}>
             <Text style={[styles.infoLabel, { color: colors.textMuted }]}>Department</Text>
             <Text style={[styles.infoValue, { color: colors.text }]}>
-              {isCeo ? 'CEO Office' : departmentLabel(user?.department)}
+              {departmentLabel(user?.department)}
             </Text>
           </View>
 
@@ -116,51 +215,11 @@ export default function ProfileScreen({ navigation }) {
             <Text style={[styles.infoLabel, { color: colors.textMuted }]}>System</Text>
             <Text style={[styles.infoValue, { color: colors.text }]}>Karios Daily Reporting</Text>
           </View>
-        </View>
 
-        {/* Settings & Appearance */}
-        <View
-          style={[
-            styles.sectionCard,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.surfaceBorder,
-            },
-          ]}
-        >
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-            APPEARANCE
-          </Text>
+          {/* Light Line Divider */}
+          <View style={[styles.cardDivider, { backgroundColor: colors.surfaceBorder }]} />
 
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={toggleTheme}
-            activeOpacity={0.7}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons
-                name={isDark ? 'moon' : 'sunny'}
-                size={20}
-                color={colors.primary}
-              />
-              <Text style={[styles.settingLabel, { color: colors.text }]}>Dark Mode</Text>
-            </View>
-            <Text style={[styles.settingValue, { color: colors.primary, fontWeight: '700' }]}>
-              {isDark ? 'Enabled' : 'Disabled'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Actions Card */}
-        <View
-          style={[
-            styles.sectionCard,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.surfaceBorder,
-            },
-          ]}
-        >
+          {/* Sign Out Button */}
           <TouchableOpacity
             style={[
               styles.signOutButton,
@@ -236,8 +295,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   userEmail: {
-    fontSize: 13,
-    marginBottom: 12,
+    fontSize: 14,
+    marginBottom: 4,
   },
   roleBadge: {
     paddingHorizontal: 14,
@@ -273,19 +332,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  settingLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  settingValue: {
-    fontSize: 13,
-  },
   divider: {
     height: 1,
     backgroundColor: 'rgba(150, 150, 150, 0.1)',
@@ -302,5 +348,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: -0.2,
+  },
+  cardDivider: {
+    height: 1,
+    marginVertical: 18,
+  },
+  ceoFieldGroup: {
+    marginBottom: 16,
+  },
+  ceoFieldLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  ceoFieldValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  permissionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
+  permPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  permPillText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

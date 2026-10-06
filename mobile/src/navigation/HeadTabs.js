@@ -1,11 +1,10 @@
-// src/navigation/HeadTabs.js
-// Bottom tab navigator for Department Heads matching user mockup (5 tabs: Home, Submit, History, Alerts, Account)
-
 import React from 'react';
+import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationContext';
 
 import HeadHomeScreen     from '../screens/head/HeadHomeScreen';
 import SubmitReportScreen from '../screens/head/SubmitReportScreen';
@@ -67,6 +66,7 @@ function AccountStack() {
 
 export default function HeadTabs() {
   const { colors } = useTheme();
+  const { hasUnread, clearBadge } = useNotifications();
 
   return (
     <Tab.Navigator
@@ -102,7 +102,26 @@ export default function HeadTabs() {
           } else if (route.name === 'History') {
             iconName = focused ? 'time' : 'time-outline';
           } else if (route.name === 'Alerts') {
-            iconName = focused ? 'notifications' : 'notifications-outline';
+            return (
+              <View style={{ width: s + 6, height: s + 6, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={s} color={color} />
+                {hasUnread && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 1,
+                      right: 1,
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: '#EF4444',
+                      borderWidth: 1.5,
+                      borderColor: colors.tabBarBg,
+                    }}
+                  />
+                )}
+              </View>
+            );
           } else if (route.name === 'Account') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -113,7 +132,16 @@ export default function HeadTabs() {
       <Tab.Screen name="Home" component={HomeStack} options={{ title: 'Home' }} />
       <Tab.Screen name="Submit" component={SubmitStack} options={{ title: 'Submit' }} />
       <Tab.Screen name="History" component={HistoryStack} options={{ title: 'History' }} />
-      <Tab.Screen name="Alerts" component={AlertsStack} options={{ title: 'Alerts' }} />
+      <Tab.Screen
+        name="Alerts"
+        component={AlertsStack}
+        listeners={{
+          tabPress: () => {
+            clearBadge();
+          },
+        }}
+        options={{ title: 'Alerts' }}
+      />
       <Tab.Screen name="Account" component={AccountStack} options={{ title: 'Account' }} />
     </Tab.Navigator>
   );

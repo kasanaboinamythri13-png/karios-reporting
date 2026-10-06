@@ -4,8 +4,8 @@ import { TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 
-export default function ThemeToggleBtn({ style, size = 40 }) {
-  const { isDark, toggleTheme } = useTheme();
+export default function ThemeToggleBtn({ style, size = 38 }) {
+  const { isDark, toggleTheme, colors } = useTheme();
 
   return (
     <TouchableOpacity
@@ -14,9 +14,9 @@ export default function ThemeToggleBtn({ style, size = 40 }) {
         {
           width: size,
           height: size,
-          borderRadius: size / 2,
-          backgroundColor: isDark ? '#21262D' : '#EDE9FE',
-          borderColor: isDark ? '#30363D' : '#DDD6FE',
+          borderRadius: 10,
+          backgroundColor: isDark ? (colors?.primaryLight || '#21262D') : '#f3e8ff',
+          borderColor: isDark ? 'rgba(139, 92, 246, 0.4)' : '#e9d5ff',
         },
         style,
       ]}
@@ -26,9 +26,9 @@ export default function ThemeToggleBtn({ style, size = 40 }) {
       accessibilityLabel={`Switch to ${isDark ? 'light' : 'dark'} theme`}
     >
       <Ionicons
-        name={isDark ? 'sunny' : 'moon'}
+        name={isDark ? 'sunny-outline' : 'moon-outline'}
         size={Math.round(size * 0.48)}
-        color={isDark ? '#FBBF24' : '#6C5CE7'}
+        color={isDark ? '#fcd34d' : (colors?.primary || '#6C5CE7')}
       />
     </TouchableOpacity>
   );
@@ -39,10 +39,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
   },
 });

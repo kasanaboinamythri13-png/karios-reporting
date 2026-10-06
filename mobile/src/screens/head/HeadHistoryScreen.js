@@ -11,6 +11,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { listReports } from '../../api/reportsApi';
@@ -170,7 +171,7 @@ export default function HeadHistoryScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* ── Top App Bar matching reference mockup ── */}
       <View style={[styles.appBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity
@@ -365,7 +366,7 @@ export default function HeadHistoryScreen() {
         }}
         onClose={() => setActiveDatePicker(null)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

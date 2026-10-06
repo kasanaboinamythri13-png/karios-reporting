@@ -1,11 +1,9 @@
-// src/screens/head/SubmitReportScreen.js
-// Department Head Submit / Edit Report screen with dynamic form schema per department
-
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { submitReport, updateReport, getReport, getTodayReport, getFormSchema } from '../../api/reportsApi';
@@ -15,6 +13,27 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { departmentLabel } from '../../utils/formatters';
 import { getDepartmentFields, toFormValues, buildReportData } from '../../utils/reportForm';
+
+function areReportDataEqual(a = {}, b = {}) {
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
+function areAttachmentsEqual(listA = [], listB = []) {
+  const idsA = (listA || []).map((a) => String(a.id || a.attachmentId || '')).filter(Boolean).sort();
+  const idsB = (listB || []).map((b) => String(b.id || b.attachmentId || '')).filter(Boolean).sort();
+  if (idsA.length !== idsB.length) return false;
+  for (let i = 0; i < idsA.length; i++) {
+    if (idsA[i] !== idsB[i]) return false;
+  }
+  return true;
+}
 
 export default function SubmitReportScreen() {
   const navigation = useNavigation();
@@ -30,10 +49,12 @@ export default function SubmitReportScreen() {
   // Fields schema & form values
   const [fields, setFields] = useState(() => getDepartmentFields(dept));
   const [values, setValues] = useState({});
+  const [initialValues, setInitialValues] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
 
   // Attachments state
   const [attachments, setAttachments] = useState([]);
+  const [initialAttachments, setInitialAttachments] = useState([]);
   const [uploadingFile, setUploadingFile] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -87,16 +108,25 @@ export default function SubmitReportScreen() {
         }
 
         if (rep && rep.data && isMounted) {
-          setValues(toFormValues(currentFields, rep.data));
-          if (Array.isArray(rep.attachments)) {
-            setAttachments(rep.attachments);
-          }
+          const loadedVals = toFormValues(currentFields, rep.data);
+          setValues(loadedVals);
+          setInitialValues(loadedVals);
+          const loadedAtts = Array.isArray(rep.attachments) ? rep.attachments : [];
+          setAttachments(loadedAtts);
+          setInitialAttachments(loadedAtts);
         } else if (isMounted) {
-          setValues(toFormValues(currentFields, {}));
+          const emptyVals = toFormValues(currentFields, {});
+          setValues(emptyVals);
+          setInitialValues(emptyVals);
           setAttachments([]);
+          setInitialAttachments([]);
         }
       } catch (err) {
-        if (isMounted) setValues(toFormValues(getDepartmentFields(dept), {}));
+        if (isMounted) {
+          const fallbackVals = toFormValues(getDepartmentFields(dept), {});
+          setValues(fallbackVals);
+          setInitialValues(fallbackVals);
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -190,6 +220,17 @@ export default function SubmitReportScreen() {
       return;
     }
 
+    if (activeReportId) {
+      const { data: initialData } = buildReportData(fields, initialValues);
+      const dataUnchanged = areReportDataEqual(data, initialData);
+      const attachmentsUnchanged = areAttachmentsEqual(attachments, initialAttachments);
+
+      if (dataUnchanged && attachmentsUnchanged) {
+        Alert.alert('No Changes', 'No changes made to update');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const attachmentIds = attachments.map((a) => a.id || a.attachmentId).filter(Boolean);
@@ -197,6 +238,8 @@ export default function SubmitReportScreen() {
 
       if (activeReportId) {
         await updateReport(activeReportId, payload);
+        setInitialValues(values);
+        setInitialAttachments(attachments);
         Alert.alert('Report Updated', 'Your daily report has been successfully updated.', [
           { text: 'OK', onPress: () => navigation.navigate('Home') },
         ]);
@@ -221,8 +264,15 @@ export default function SubmitReportScreen() {
                   const repObj = today?.report || (today?.id ? today : null);
                   if (repObj?.id) {
                     setActiveReportId(repObj.id);
-                    if (repObj.data) setValues(toFormValues(fields, repObj.data));
-                    if (Array.isArray(repObj.attachments)) setAttachments(repObj.attachments);
+                    if (repObj.data) {
+                      const v = toFormValues(fields, repObj.data);
+                      setValues(v);
+                      setInitialValues(v);
+                    }
+                    if (Array.isArray(repObj.attachments)) {
+                      setAttachments(repObj.attachments);
+                      setInitialAttachments(repObj.attachments);
+                    }
                   }
                 } catch {
                   // Ignore
@@ -245,7 +295,19 @@ export default function SubmitReportScreen() {
   }
 
   function handleCancel() {
-    const isDirty = Object.values(values).some((v) => typeof v === 'string' && v.trim() !== '');
+    let isDirty = false;
+    if (activeReportId) {
+      const { data } = buildReportData(fields, values);
+      const { data: initialData } = buildReportData(fields, initialValues);
+      const dataUnchanged = areReportDataEqual(data, initialData);
+      const attachmentsUnchanged = areAttachmentsEqual(attachments, initialAttachments);
+      isDirty = !dataUnchanged || !attachmentsUnchanged;
+    } else {
+      const hasText = Object.values(values).some((v) => typeof v === 'string' && v.trim() !== '');
+      const hasFiles = attachments.length > 0;
+      isDirty = hasText || hasFiles;
+    }
+
     if (isDirty) {
       Alert.alert('Discard Changes?', 'You have unsaved changes. Are you sure you want to discard them?', [
         { text: 'Keep Editing', style: 'cancel' },
@@ -265,16 +327,17 @@ export default function SubmitReportScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* ── Top App Bar ── */}
         <View style={styles.appBar}>
           <TouchableOpacity
             style={[styles.backBox, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => navigation.goBack()}
+            onPress={handleCancel}
             activeOpacity={0.75}
           >
             <Ionicons name="chevron-back" size={20} color={colors.text} />
@@ -480,7 +543,8 @@ export default function SubmitReportScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

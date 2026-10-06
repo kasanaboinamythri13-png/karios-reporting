@@ -1,6 +1,5 @@
-// mobile/src/navigation/RootNavigator.js
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -8,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationContext';
 
 // Auth Screens
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -32,6 +32,7 @@ const Tab = createBottomTabNavigator();
 // CEO Tab Navigator
 function CeoTabNavigator() {
   const { colors, isDark } = useTheme();
+  const { hasUnread, clearBadge } = useNotifications();
 
   const ceoTabOptions = {
     headerShown: false,
@@ -76,10 +77,32 @@ function CeoTabNavigator() {
       <Tab.Screen
         name="NotificationsTab"
         component={NotificationsScreen}
+        listeners={{
+          tabPress: () => {
+            clearBadge();
+          },
+        }}
         options={{
           tabBarLabel: 'Alerts',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications-outline" size={size} color={color} />
+            <View style={{ width: size + 6, height: size + 6, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="notifications-outline" size={size} color={color} />
+              {hasUnread && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 1,
+                    right: 1,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: '#EF4444',
+                    borderWidth: 1.5,
+                    borderColor: colors.surface,
+                  }}
+                />
+              )}
+            </View>
           ),
         }}
       />
