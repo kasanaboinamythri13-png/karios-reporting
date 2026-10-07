@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getReport, listReports } from '../../api/reportsApi';
@@ -14,6 +15,28 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { departmentLabel, departmentLetter, formatRelativeDate, formatISTTime } from '../../utils/formatters';
 import AttachmentViewerModal from '../../components/AttachmentViewerModal';
+
+function formatRejectionDateTime(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    const dateFormatted = d.toLocaleDateString('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+    const timeFormatted = d.toLocaleTimeString('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    return `${dateFormatted}, ${timeFormatted}`;
+  } catch {
+    return dateStr;
+  }
+}
 
 export default function ReportDetailScreen() {
   const route = useRoute();
@@ -60,22 +83,34 @@ export default function ReportDetailScreen() {
     return () => { isMounted = false; };
   }, [activeReportId, department]);
 
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      if (user?.role === 'CEO') {
+        navigation.navigate('CeoMain');
+      } else {
+        navigation.navigate('HeadApp');
+      }
+    }
+  };
+
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!report) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.center, { backgroundColor: colors.background }]}>
         <Text style={[styles.errorText, { color: colors.text }]}>Report not found.</Text>
-        <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={handleBack}>
           <Text style={styles.retryText}>Go Back</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -89,33 +124,23 @@ export default function ReportDetailScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
       {/* ── Top App Bar ── */}
       <View style={[styles.appBar, { borderBottomColor: colors.border }]}>
         <TouchableOpacity
           style={[styles.backBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.75}
+          onPress={handleBack}
+          activeOpacity={0.7}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
         >
-          <Ionicons name="chevron-back" size={20} color={colors.text} />
+          <Ionicons name="chevron-back" size={22} color={colors.text} />
         </TouchableOpacity>
 
         <View style={styles.appBarCenter}>
           <Text style={[styles.appBarTitle, { color: colors.text }]}>Report Details</Text>
         </View>
 
-        {canEdit ? (
-          <TouchableOpacity
-            style={[styles.editTopBtn, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.2)' : '#EDE9FE' }]}
-            onPress={handleEdit}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="create-outline" size={16} color={colors.primary} />
-            <Text style={[styles.editTopBtnText, { color: colors.primary }]}>Edit</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 38 }} />
-        )}
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -137,17 +162,23 @@ export default function ReportDetailScreen() {
 
         {/* ── Rejection Alert if Rejected ── */}
         {report.status === 'REJECTED' && (
-          <View style={[styles.rejectedBanner, { backgroundColor: isDark ? '#3E1F1F' : '#FEF2F2', borderColor: '#EF4444' }]}>
-            <Ionicons name="alert-circle" size={20} color="#EF4444" />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={[styles.rejectedTitle, { color: '#EF4444' }]}>Changes Requested by CEO</Text>
-              {report.review_comment ? (
-                <Text style={[styles.rejectedDesc, { color: colors.text }]}>"{report.review_comment}"</Text>
-              ) : null}
-              <Text style={[styles.rejectedHint, { color: colors.textSecondary }]}>
-                Tap "Edit Report" below to make adjustments and re-submit for review.
+          <View
+            style={[
+              styles.rejectedBanner,
+              {
+                backgroundColor: isDark ? 'rgba(239, 68, 68, 0.14)' : '#FEF2F2',
+                borderColor: isDark ? 'rgba(239, 68, 68, 0.28)' : '#FECACA',
+              },
+            ]}
+          >
+            <Text style={[styles.rejectedTitle, { color: isDark ? '#F87171' : '#DC2626' }]}>
+              Rejected by CEO{report.reviewed_at ? ` · ${formatRejectionDateTime(report.reviewed_at)}` : ''}
+            </Text>
+            {report.review_comment ? (
+              <Text style={[styles.rejectedDesc, { color: isDark ? '#F1F5F9' : '#1E293B' }]}>
+                "{report.review_comment}"
               </Text>
-            </View>
+            ) : null}
           </View>
         )}
 
@@ -213,26 +244,6 @@ export default function ReportDetailScreen() {
           </View>
         )}
 
-        {/* ── CEO Review Card ── */}
-        {(report.reviewed_at || report.review_comment) && (
-          <View
-            style={[
-              styles.section,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                borderLeftWidth: 4,
-                borderLeftColor: report.status === 'APPROVED' ? colors.approved : colors.rejected,
-              },
-            ]}
-          >
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>CEO Review</Text>
-            <Text style={[styles.reviewAt, { color: colors.textMuted }]}>Reviewed {formatISTTime(report.reviewed_at)}</Text>
-            {report.review_comment ? (
-              <Text style={[styles.reviewComment, { color: colors.text }]}>{report.review_comment}</Text>
-            ) : null}
-          </View>
-        )}
 
         {/* ── Bottom Action: Edit Report Button ── */}
         {canEdit && (
@@ -261,7 +272,7 @@ export default function ReportDetailScreen() {
         attachment={selectedAttachment}
         onClose={() => setSelectedAttachment(null)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -277,33 +288,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
   backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   appBarCenter: { flex: 1, alignItems: 'center' },
   appBarTitle: { fontSize: 17, fontWeight: '800' },
-  editTopBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
-  },
-  editTopBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
 
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
@@ -330,25 +329,20 @@ const styles = StyleSheet.create({
   submittedAt:{ fontSize: 12, marginTop: -6, marginLeft: 4 },
 
   rejectedBanner: {
-    flexDirection: 'row',
-    gap: 10,
-    padding: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 12,
     borderWidth: 1,
-    alignItems: 'flex-start',
+    gap: 4,
   },
   rejectedTitle: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '700',
   },
   rejectedDesc: {
-    fontSize: 13,
-    fontStyle: 'italic',
-    marginTop: 2,
-  },
-  rejectedHint: {
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '400',
   },
 
   section: {
@@ -361,8 +355,6 @@ const styles = StyleSheet.create({
   fieldRow:   { borderBottomWidth: 1, paddingBottom: 10, gap: 3 },
   fieldLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
   fieldValue: { fontSize: 14, lineHeight: 20 },
-  reviewAt:   { fontSize: 12 },
-  reviewComment: { fontSize: 14, lineHeight: 20 },
 
   bottomEditBtn: {
     flexDirection: 'row',

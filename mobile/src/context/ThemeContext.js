@@ -47,22 +47,20 @@ export function ThemeProvider({ children }) {
     changeTheme(themePreference === 'light' ? 'dark' : 'light');
   };
 
-  // Rule: Dark theme is available for CEO; Department Heads stay in Light theme
   const isCeoRole = user?.role === 'CEO';
-  const effectiveTheme = isCeoRole ? themePreference : 'light';
-  const isDark = effectiveTheme === 'dark';
+  const isDark = themePreference === 'dark';
   const activeColors = isDark ? darkColors : lightColors;
 
   const value = useMemo(
     () => ({
-      theme: effectiveTheme,
+      theme: themePreference,
       isDark,
       colors: activeColors,
       setTheme: changeTheme,
       toggleTheme,
       isCeoRole,
     }),
-    [effectiveTheme, isDark, activeColors, isCeoRole]
+    [themePreference, isDark, activeColors, isCeoRole]
   );
 
   return (
