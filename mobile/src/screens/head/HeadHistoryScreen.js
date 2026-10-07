@@ -19,7 +19,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { departmentLabel } from '../../utils/formatters';
 import DatePickerModal, { formatDdMmYyyy } from '../../components/DatePickerModal';
-import ThemeToggleBtn from '../../components/ThemeToggleBtn';
 
 const STATUS_TABS = [
   { key: 'ALL', label: 'All' },
@@ -188,7 +187,6 @@ export default function HeadHistoryScreen() {
             {deptName} department submissions
           </Text>
         </View>
-        <ThemeToggleBtn size={36} />
       </View>
 
       {/* ── Filter Controls Container ── */}

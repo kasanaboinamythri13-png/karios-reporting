@@ -10,7 +10,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { getReport, listReports } from '../../api/reportsApi';
 import { formatFileSize } from '../../api/attachmentsApi';
 import StatusBadge from '../../components/StatusBadge';
-import ThemeToggleBtn from '../../components/ThemeToggleBtn';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { departmentLabel, departmentLetter, formatRelativeDate, formatISTTime } from '../../utils/formatters';
@@ -105,19 +104,18 @@ export default function ReportDetailScreen() {
           <Text style={[styles.appBarTitle, { color: colors.text }]}>Report Details</Text>
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          {canEdit && (
-            <TouchableOpacity
-              style={[styles.editTopBtn, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.2)' : '#EDE9FE' }]}
-              onPress={handleEdit}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="create-outline" size={16} color={colors.primary} />
-              <Text style={[styles.editTopBtnText, { color: colors.primary }]}>Edit</Text>
-            </TouchableOpacity>
-          )}
-          <ThemeToggleBtn size={36} />
-        </View>
+        {canEdit ? (
+          <TouchableOpacity
+            style={[styles.editTopBtn, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.2)' : '#EDE9FE' }]}
+            onPress={handleEdit}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="create-outline" size={16} color={colors.primary} />
+            <Text style={[styles.editTopBtnText, { color: colors.primary }]}>Edit</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 38 }} />
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -345,6 +343,7 @@ const styles = StyleSheet.create({
   },
   rejectedDesc: {
     fontSize: 13,
+    fontStyle: 'italic',
     marginTop: 2,
   },
   rejectedHint: {

@@ -47,9 +47,9 @@ export function ThemeProvider({ children }) {
     changeTheme(themePreference === 'light' ? 'dark' : 'light');
   };
 
-  // Both CEO and Department Heads (all 4 departments) can toggle dark and light theme
+  // Rule: Dark theme is available for CEO; Department Heads stay in Light theme
   const isCeoRole = user?.role === 'CEO';
-  const effectiveTheme = themePreference;
+  const effectiveTheme = isCeoRole ? themePreference : 'light';
   const isDark = effectiveTheme === 'dark';
   const activeColors = isDark ? darkColors : lightColors;
 
