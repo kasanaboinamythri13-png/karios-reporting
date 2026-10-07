@@ -5,7 +5,6 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  TextInput,
   Modal,
   RefreshControl,
   StyleSheet,
@@ -76,7 +75,6 @@ export default function CeoReportsScreen({ navigation }) {
   const [department, setDepartment] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
 
   const [rawReports, setRawReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -137,28 +135,16 @@ export default function CeoReportsScreen({ navigation }) {
       if (dateFrom && reportDate && reportDate < dateFrom) return false;
       if (dateTo && reportDate && reportDate > dateTo) return false;
 
-      // Search query filter
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const dept = (r.department || '').toLowerCase();
-        const head = (r.head_title || r.submitted_by || '').toLowerCase();
-        const deptLbl = departmentLabel(r.department).toLowerCase();
-        if (!dept.includes(q) && !head.includes(q) && !deptLbl.includes(q)) {
-          return false;
-        }
-      }
-
       return true;
     });
-  }, [rawReports, filter, department, dateFrom, dateTo, searchQuery]);
+  }, [rawReports, filter, department, dateFrom, dateTo]);
 
-  const hasActiveFilters = Boolean(department || dateFrom || dateTo || searchQuery.trim());
+  const hasActiveFilters = Boolean(department || dateFrom || dateTo);
 
   const clearAllFilters = () => {
     setDepartment('');
     setDateFrom('');
     setDateTo('');
-    setSearchQuery('');
   };
 
   // Open calendar modal
@@ -302,34 +288,8 @@ export default function CeoReportsScreen({ navigation }) {
         })}
       </View>
 
-      {/* Filter Card (Search, Department & Date Range) */}
+      {/* Filter Card (Department & Date Range) */}
       <View style={[styles.filterCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-        {/* Search Input */}
-        <View
-          style={[
-            styles.searchRow,
-            {
-              backgroundColor: colors.inputBg,
-              borderColor: colors.surfaceBorder,
-            },
-          ]}
-        >
-          <Ionicons name="search" size={15} color={colors.textLight} style={styles.searchIcon} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search reports by department, head…"
-            placeholderTextColor={colors.textLight}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
-          />
-          {Boolean(searchQuery) && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={16} color={colors.textLight} />
-            </TouchableOpacity>
-          )}
-        </View>
-
         {/* Filter Controls Row: Department, From Date, To Date */}
         <View style={styles.controlsRow}>
           {/* Department Dropdown */}
@@ -682,22 +642,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
     gap: 10,
-  },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    height: 38,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    paddingVertical: 0,
   },
   controlsRow: {
     flexDirection: 'row',
