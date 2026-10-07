@@ -644,7 +644,6 @@ const styles = StyleSheet.create({
   },
   reviewedCommentText: {
     fontSize: 13,
-    fontStyle: 'italic',
     marginTop: 4,
   },
   reviewedDateText: {

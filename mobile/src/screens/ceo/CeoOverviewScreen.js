@@ -20,10 +20,12 @@ import StatCard from '../../components/StatCard';
 import StatusBadge from '../../components/StatusBadge';
 import KariosLogo from '../../components/KariosLogo';
 import { LoadingScreen, ErrorBanner } from '../../components/Feedback';
+import DatePickerModal from '../../components/DatePickerModal';
 
 export default function CeoOverviewScreen({ navigation }) {
   const { colors, isDark, toggleTheme } = useTheme();
   const [date, setDate] = useState(getTodayISODate());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -140,7 +142,7 @@ export default function CeoOverviewScreen({ navigation }) {
                 borderColor: colors.surfaceBorder,
               },
             ]}
-            onPress={() => setDate(getTodayISODate())}
+            onPress={() => setShowDatePicker(true)}
             activeOpacity={0.7}
           >
             <Text style={[styles.datePickerBtnText, { color: colors.text }]}>{date}</Text>
@@ -261,6 +263,18 @@ export default function CeoOverviewScreen({ navigation }) {
           })}
         </View>
       </ScrollView>
+
+      <DatePickerModal
+        visible={showDatePicker}
+        title="Select Overview Date"
+        currentDate={date}
+        maxDate={getTodayISODate()}
+        onSelect={(selectedIso) => {
+          setDate(selectedIso);
+          setShowDatePicker(false);
+        }}
+        onClose={() => setShowDatePicker(false)}
+      />
     </SafeAreaView>
   );
 }

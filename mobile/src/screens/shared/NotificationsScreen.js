@@ -18,6 +18,7 @@ import { useNotifications } from '../../context/NotificationContext';
 import { formatDateTime } from '../../utils/date';
 import Header from '../../components/Header';
 import { LoadingScreen, EmptyState } from '../../components/Feedback';
+import ThemeToggleBtn from '../../components/ThemeToggleBtn';
 
 export default function NotificationsScreen({ navigation }) {
   const { user } = useAuth();
@@ -169,11 +170,14 @@ export default function NotificationsScreen({ navigation }) {
         title="Notifications"
         subtitle={unreadCount > 0 ? `${unreadCount} unread alert${unreadCount > 1 ? 's' : ''}` : 'All caught up'}
         rightAction={
-          unreadCount > 0 ? (
-            <TouchableOpacity onPress={handleMarkAllRead} style={styles.markReadBtn}>
-              <Text style={styles.markReadText}>Mark all read</Text>
-            </TouchableOpacity>
-          ) : null
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {unreadCount > 0 && (
+              <TouchableOpacity onPress={handleMarkAllRead} style={styles.markReadBtn}>
+                <Text style={styles.markReadText}>Mark all read</Text>
+              </TouchableOpacity>
+            )}
+            <ThemeToggleBtn size={36} />
+          </View>
         }
       />
 

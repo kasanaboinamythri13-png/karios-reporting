@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { departmentLabel } from '../../utils/formatters';
 import { getDepartmentFields, toFormValues, buildReportData } from '../../utils/reportForm';
+import ThemeToggleBtn from '../../components/ThemeToggleBtn';
 
 function areReportDataEqual(a = {}, b = {}) {
   const keysA = Object.keys(a);
@@ -351,6 +352,8 @@ export default function SubmitReportScreen() {
               {deptName} · {formattedToday}
             </Text>
           </View>
+
+          <ThemeToggleBtn size={36} />
         </View>
 
         {/* ── Daily Report Card ── */}
