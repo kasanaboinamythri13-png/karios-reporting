@@ -36,15 +36,15 @@ export async function authenticate(req, res, next) {
     else if (who.includes('market') || who.includes('mktg')) role = 'MARKETING_HEAD';
     else if (who.includes('fin')) role = 'FINANCE_HEAD';
     else if (who.includes('dev')) role = 'DEVELOPER_HEAD';
-    if (!role) {
+
+    if (!role && !who.includes('@')) {
       return next(Unauthorized(`Unknown test login '${token}'. Use dev-ceo, dev-development, dev-sales, dev-marketing or dev-finance.`));
     }
 
     try {
-      const result = await query(
-        'SELECT id, email, role, department, title, is_active FROM users WHERE role = $1 LIMIT 1;',
-        [role],
-      );
+      const result = who.includes('@')
+        ? await query('SELECT id, email, role, department, title, is_active FROM users WHERE lower(email) = lower($1) LIMIT 1;', [who])
+        : await query('SELECT id, email, role, department, title, is_active FROM users WHERE role = $1 LIMIT 1;', [role]);
       if (result.rows.length === 0) {
         return next(Unauthorized(`Dev user for token '${token}' not found in database. Run migrations first.`));
       }

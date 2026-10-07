@@ -99,5 +99,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 10,
     letterSpacing: -0.2,
+    textAlign: 'center',
+    alignSelf: 'center',
   },
 });

@@ -7,33 +7,59 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { getReport } from '../../api/reportsApi';
+import { getReport, listReports } from '../../api/reportsApi';
 import { formatFileSize } from '../../api/attachmentsApi';
 import StatusBadge from '../../components/StatusBadge';
 import ThemeToggleBtn from '../../components/ThemeToggleBtn';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { departmentLabel, departmentLetter, formatRelativeDate, formatISTTime } from '../../utils/formatters';
+import AttachmentViewerModal from '../../components/AttachmentViewerModal';
 
 export default function ReportDetailScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
-  const { reportId } = route.params || {};
+  const { reportId, id, report_id, department } = route.params || {};
+  const activeReportId = reportId || id || report_id;
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedAttachment, setSelectedAttachment] = useState(null);
 
   useEffect(() => {
-    if (!reportId) {
-      setLoading(false);
-      return;
+    let isMounted = true;
+    async function load() {
+      if (!activeReportId && !department) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        if (activeReportId) {
+          const res = await getReport(activeReportId);
+          const rep = (res && res.id) ? res : (res?.report?.id ? res.report : (res?.report || res));
+          if (rep && (rep.id || rep.department) && isMounted) {
+            setReport(rep);
+            return;
+          }
+        }
+        if (department) {
+          const list = await listReports({ department });
+          if (list && list.length > 0 && isMounted) {
+            setReport(list[0]);
+            return;
+          }
+        }
+      } catch {
+        if (isMounted) Alert.alert('Error', 'Could not load report.');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     }
-    getReport(reportId)
-      .then((res) => setReport(res?.report || res))
-      .catch(() => Alert.alert('Error', 'Could not load report.'))
-      .finally(() => setLoading(false));
-  }, [reportId]);
+    load();
+    return () => { isMounted = false; };
+  }, [activeReportId, department]);
 
   if (loading) {
     return (
@@ -159,9 +185,11 @@ export default function ReportDetailScreen() {
               const name = file.fileName || file.filename || `Attachment ${idx + 1}`;
               const isPdf = file.mimeType === 'application/pdf' || name.toLowerCase().endsWith('.pdf');
               return (
-                <View
+                <TouchableOpacity
                   key={file.id || idx}
                   style={[styles.fieldRow, { borderBottomColor: colors.border, alignItems: 'center' }]}
+                  onPress={() => setSelectedAttachment(file)}
+                  activeOpacity={0.7}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                     <Ionicons
@@ -180,7 +208,8 @@ export default function ReportDetailScreen() {
                       ) : null}
                     </View>
                   </View>
-                </View>
+                  <Ionicons name="eye-outline" size={18} color={colors.primary} />
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -228,6 +257,12 @@ export default function ReportDetailScreen() {
           </View>
         )}
       </ScrollView>
+
+      <AttachmentViewerModal
+        visible={Boolean(selectedAttachment)}
+        attachment={selectedAttachment}
+        onClose={() => setSelectedAttachment(null)}
+      />
     </View>
   );
 }

@@ -1,4 +1,3 @@
-// mobile/src/screens/shared/NotificationsScreen.js
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -7,12 +6,15 @@ import {
   TouchableOpacity,
   RefreshControl,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { formatDateTime } from '../../utils/date';
 import Header from '../../components/Header';
 import { LoadingScreen, EmptyState } from '../../components/Feedback';
@@ -21,6 +23,7 @@ import ThemeToggleBtn from '../../components/ThemeToggleBtn';
 export default function NotificationsScreen({ navigation }) {
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
+  const { clearBadge, markAllAsRead: contextMarkAllAsRead, fetchNotifications: contextRefresh } = useNotifications();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -39,18 +42,26 @@ export default function NotificationsScreen({ navigation }) {
     }
   }, []);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+  useFocusEffect(
+    useCallback(() => {
+      // Clear badge immediately upon entering the alerts page
+      clearBadge();
+      fetchNotifications();
+      // Mark read in backend so unread badge stays cleared
+      api.markAllNotificationsRead().catch(() => {});
+    }, [clearBadge, fetchNotifications])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchNotifications(true);
+    contextRefresh(true);
   };
 
   const handleMarkAllRead = async () => {
     try {
       await api.markAllNotificationsRead();
+      contextMarkAllAsRead();
     } catch {}
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   };
@@ -65,13 +76,32 @@ export default function NotificationsScreen({ navigation }) {
       );
     }
 
-    if (item.report_id) {
+    const repId = item.report_id || item.reportId;
+    let inferredDept = item.department;
+    if (!inferredDept) {
+      const text = `${item.title || ''} ${item.body || ''}`.toUpperCase();
+      if (text.includes('MARKETING')) inferredDept = 'MARKETING';
+      else if (text.includes('DEVELOPMENT') || text.includes('DEVELOPER')) inferredDept = 'DEVELOPMENT';
+      else if (text.includes('SALES')) inferredDept = 'SALES';
+      else if (text.includes('FINANCE')) inferredDept = 'FINANCE';
+    }
+
+    if (repId || inferredDept) {
       const targetScreen = user?.role === 'CEO' ? 'CeoReportDetail' : 'ReportDetail';
+      const navParams = {
+        reportId: repId,
+        id: repId,
+        report_id: repId,
+        department: inferredDept,
+      };
+
       try {
-        navigation.navigate(targetScreen, { reportId: item.report_id });
+        navigation.navigate(targetScreen, navParams);
       } catch {
-        navigation.navigate('CeoReportDetail', { reportId: item.report_id });
+        navigation.navigate('CeoReportDetail', navParams);
       }
+    } else {
+      Alert.alert(item.title || 'Notification', item.body || 'No report attached to this alert.');
     }
   };
 

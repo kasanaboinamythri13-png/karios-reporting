@@ -1,11 +1,9 @@
-// src/screens/head/HeadHomeScreen.js
-// Department Overview screen matching user mockup
-
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getTodayReport, listReports } from '../../api/reportsApi';
@@ -88,20 +86,29 @@ export default function HeadHomeScreen() {
   }
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor={colors.primary} />
-      }
-    >
-      {/* ── Brand Bar: Left-aligned Karios Logo & Theme Toggle on Right ── */}
-      <View style={styles.brandRow}>
-        <KariosLogo width={175} height={55} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* ── Top Brand Bar: Exact Karios Reporting Logo + Quick Theme Toggle ── */}
+      <View
+        style={[
+          styles.topBrandBar,
+          {
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.surfaceBorder || colors.border,
+          },
+        ]}
+      >
+        <KariosLogo size={36} subtitle="REPORTING" align="left" />
         <ThemeToggleBtn size={38} />
       </View>
 
-      {/* ── Top Header ── */}
+      <ScrollView
+        style={[styles.scroll, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor={colors.primary} />
+        }
+      >
+        {/* ── Top Header ── */}
       <View style={styles.topHeader}>
         <View>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Department Overview</Text>
@@ -305,20 +312,25 @@ export default function HeadHomeScreen() {
         )}
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20, paddingTop: 16, paddingBottom: 40, gap: 16 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  brandRow: {
+  scroll: { flex: 1 },
+  topBrandBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 8 : 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
   },
+  content: { padding: 20, paddingTop: 16, paddingBottom: 40, gap: 16 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
   topHeader: {
     flexDirection: 'row',
     alignItems: 'center',

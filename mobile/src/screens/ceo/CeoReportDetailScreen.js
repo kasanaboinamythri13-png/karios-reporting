@@ -23,6 +23,7 @@ import { formatUSD } from '../../utils/currency';
 import Header from '../../components/Header';
 import StatusBadge from '../../components/StatusBadge';
 import { LoadingScreen, ErrorBanner } from '../../components/Feedback';
+import AttachmentViewerModal from '../../components/AttachmentViewerModal';
 
 const FORM_FIELDS = {
   DEVELOPMENT: [
@@ -71,6 +72,7 @@ export default function CeoReportDetailScreen({ route, navigation }) {
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [comment, setComment] = useState('');
+  const [selectedAttachment, setSelectedAttachment] = useState(null);
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
@@ -78,18 +80,23 @@ export default function CeoReportDetailScreen({ route, navigation }) {
     try {
       if (activeReportId) {
         const res = await api.getReport(activeReportId);
-        const rep = res?.report || res?.data || res;
+        // Handle all shapes: direct object, wrapped in report, or wrapped in data
+        const rep = (res && res.id)
+          ? res
+          : (res?.report?.id ? res.report : (res?.data?.id ? res.data : (res?.report || res)));
+
         if (rep && (rep.id || rep.department || rep.status)) {
           setReport(rep);
           return;
         }
       }
 
-      // Fallback: If no reportId but department is provided, check for latest report
-      if (department) {
-        const res = await api.getReports({ department });
-        const list = res?.reports || res?.data || (Array.isArray(res) ? res : []);
-        if (list.length > 0) {
+      // Fallback: If no reportId or report not found by ID, check if department was provided
+      const targetDept = department || route?.params?.department;
+      if (targetDept) {
+        const res = await api.getReports({ department: targetDept });
+        const list = res?.reports || (Array.isArray(res?.data) ? res.data : []) || (Array.isArray(res) ? res : []);
+        if (list && list.length > 0) {
           setReport(list[0]);
           return;
         }
@@ -101,7 +108,7 @@ export default function CeoReportDetailScreen({ route, navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [activeReportId, department]);
+  }, [activeReportId, department, route?.params?.department]);
 
   useEffect(() => {
     fetchReport();
@@ -288,15 +295,60 @@ export default function CeoReportDetailScreen({ route, navigation }) {
           {/* Attachments Section */}
           {currentReport.attachments && currentReport.attachments.length > 0 && (
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-              <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>Attachments</Text>
-              {currentReport.attachments.map((att, idx) => (
-                <View key={idx} style={[styles.attachmentRow, { backgroundColor: colors.background }]}>
-                  <Ionicons name="document-attach-outline" size={20} color={colors.primary} />
-                  <Text style={[styles.attachmentName, { color: colors.text }]}>
-                    {att.name || `Document #${idx + 1}`}
-                  </Text>
-                </View>
-              ))}
+              <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>
+                Attachments ({currentReport.attachments.length})
+              </Text>
+              {currentReport.attachments.map((att, idx) => {
+                const name = att.fileName || att.filename || att.name || `Document #${idx + 1}`;
+                const isImg = att.mimeType?.startsWith('image/') || /\.(png|jpg|jpeg|webp)$/i.test(name);
+                const isPdf = att.mimeType === 'application/pdf' || /\.pdf$/i.test(name);
+
+                return (
+                  <TouchableOpacity
+                    key={att.id || idx}
+                    style={[
+                      styles.attachmentRow,
+                      {
+                        backgroundColor: colors.background,
+                        borderWidth: 1,
+                        borderColor: colors.surfaceBorder,
+                      },
+                    ]}
+                    onPress={() => setSelectedAttachment(att)}
+                    activeOpacity={0.7}
+                  >
+                    <View
+                      style={[
+                        styles.attachmentIconWrap,
+                        {
+                          backgroundColor: isImg
+                            ? 'rgba(124, 58, 237, 0.12)'
+                            : isPdf
+                            ? 'rgba(239, 68, 68, 0.12)'
+                            : 'rgba(100, 116, 139, 0.12)',
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={isImg ? 'image' : isPdf ? 'document-text' : 'attach'}
+                        size={20}
+                        color={isImg ? colors.primary : isPdf ? '#EF4444' : '#64748B'}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={[styles.attachmentName, { color: colors.text }]} numberOfLines={1}>
+                        {name}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.viewBadge, { backgroundColor: isDark ? 'rgba(167, 139, 250, 0.15)' : '#F3E8FF' }]}>
+                      <Ionicons name="eye-outline" size={16} color={colors.primary} />
+                      <Text style={[styles.viewBadgeText, { color: colors.primary }]}>View</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
 
@@ -405,6 +457,12 @@ export default function CeoReportDetailScreen({ route, navigation }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <AttachmentViewerModal
+        visible={Boolean(selectedAttachment)}
+        attachment={selectedAttachment}
+        onClose={() => setSelectedAttachment(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -491,15 +549,37 @@ const styles = StyleSheet.create({
   attachmentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    padding: 10,
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  attachmentIconWrap: {
+    width: 36,
+    height: 36,
     borderRadius: 8,
-    marginTop: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   attachmentName: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  attachmentSub: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  viewBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  viewBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   reviewCard: {
     borderRadius: 16,

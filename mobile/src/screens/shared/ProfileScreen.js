@@ -14,10 +14,11 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { departmentLabel } from '../../utils/roles';
 import Header from '../../components/Header';
+import ThemeToggleBtn from '../../components/ThemeToggleBtn';
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
-  const { isDark, colors, toggleTheme } = useTheme();
+  const { isDark, colors } = useTheme();
 
   const handleLogout = () => {
     Alert.alert(
@@ -37,43 +38,126 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const isCeo = user?.role === 'CEO';
-  const roleTitle = isCeo ? 'CEO' : (user?.title || `${departmentLabel(user?.department)} Head`);
-  const accessLevel = isCeo
-    ? 'Full Admin Access — All Departments'
-    : `Department Head Access — ${departmentLabel(user?.department)}`;
+  const roleDisplay = isCeo ? 'CEO' : (user?.title || `${departmentLabel(user?.department)} Head`);
 
-  const permissions = isCeo
-    ? [
-        'View All Reports',
-        'Approve Reports',
-        'Reject Reports',
-        'Dashboard Overview',
-      ]
-    : [
-        'Submit Daily Report',
-        'View Department History',
-        'Edit Pending Reports',
-        'Upload Attachments',
-      ];
+  if (isCeo) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header
+          title="Profile"
+          subtitle="Account settings & permissions"
+          rightAction={<ThemeToggleBtn size={38} />}
+        />
 
-  const avatarLetter = isCeo
-    ? 'C'
-    : (user?.department?.charAt(0) || user?.name?.charAt(0) || 'H').toUpperCase();
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View
+            style={[
+              styles.profileCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.surfaceBorder,
+              },
+            ]}
+          >
+            {/* Avatar & Header */}
+            <View style={styles.avatarContainer}>
+              <View
+                style={[
+                  styles.avatarCircle,
+                  {
+                    backgroundColor: colors.primary,
+                  },
+                ]}
+              >
+                <Text style={styles.avatarText}>C</Text>
+              </View>
+              <Text style={[styles.userName, { color: colors.text }]}>CEO</Text>
+              <Text style={[styles.userEmail, { color: colors.textMuted }]}>
+                {user?.email || 'ceo@karios.com'}
+              </Text>
+            </View>
+
+            {/* Divider */}
+            <View style={[styles.cardDivider, { backgroundColor: colors.surfaceBorder }]} />
+
+            {/* Role */}
+            <View style={styles.ceoFieldGroup}>
+              <Text style={[styles.ceoFieldLabel, { color: colors.textMuted }]}>Role</Text>
+              <Text style={[styles.ceoFieldValue, { color: colors.text }]}>CEO</Text>
+            </View>
+
+            {/* Access Level */}
+            <View style={styles.ceoFieldGroup}>
+              <Text style={[styles.ceoFieldLabel, { color: colors.textMuted }]}>Access Level</Text>
+              <Text style={[styles.ceoFieldValue, { color: colors.text }]}>
+                Full Admin Access — All Departments
+              </Text>
+            </View>
+
+            {/* Permissions */}
+            <View style={styles.ceoFieldGroup}>
+              <Text style={[styles.ceoFieldLabel, { color: colors.textMuted }]}>Permissions</Text>
+              <View style={styles.permissionsGrid}>
+                {['View All Reports', 'Approve Reports', 'Reject Reports', 'Dashboard Overview'].map(
+                  (perm) => (
+                    <View
+                      key={perm}
+                      style={[
+                        styles.permPill,
+                        {
+                          backgroundColor: isDark ? 'rgba(167, 139, 250, 0.15)' : '#f3e8ff',
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.permPillText, { color: colors.primary }]}>{perm}</Text>
+                    </View>
+                  )
+                )}
+              </View>
+            </View>
+
+            {/* Divider */}
+            <View style={[styles.cardDivider, { backgroundColor: colors.surfaceBorder }]} />
+
+            {/* Sign Out Button (Styled like 2nd image) */}
+            <TouchableOpacity
+              style={[
+                styles.signOutButton,
+                {
+                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#fee2e2',
+                  borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#fca5a5',
+                },
+              ]}
+              onPress={handleLogout}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.signOutButtonText,
+                  { color: isDark ? '#f87171' : '#dc2626' },
+                ]}
+              >
+                Sign Out
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? colors.background : '#f4f6fa' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
-        title="Profile"
-        subtitle="Account settings & permissions"
-        rightIcon={isDark ? 'sunny-outline' : 'moon-outline'}
-        onRightPress={toggleTheme}
+        title="Account"
+        rightAction={<ThemeToggleBtn size={38} />}
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Main Profile Card */}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Single Unified Card for Department Head */}
         <View
           style={[
-            styles.card,
+            styles.profileCard,
             {
               backgroundColor: colors.surface,
               borderColor: colors.surfaceBorder,
@@ -81,65 +165,67 @@ export default function ProfileScreen({ navigation }) {
             },
           ]}
         >
-          {/* Avatar & Header Identity */}
-          <View style={styles.headerBlock}>
-            <View style={[styles.avatarCircle, { backgroundColor: colors.primary }]}>
-              <Text style={styles.avatarText}>{avatarLetter}</Text>
+          {/* Avatar & Header */}
+          <View style={styles.avatarContainer}>
+            <View
+              style={[
+                styles.avatarCircle,
+                {
+                  backgroundColor: colors.primary,
+                },
+              ]}
+            >
+              <Text style={styles.avatarText}>
+                {roleDisplay ? roleDisplay.charAt(0).toUpperCase() : (user?.email?.charAt(0) || 'U').toUpperCase()}
+              </Text>
             </View>
-            <Text style={[styles.profileTitle, { color: colors.text }]}>{roleTitle}</Text>
-            <Text style={[styles.profileEmail, { color: colors.textMuted }]}>
-              {user?.email || (isCeo ? 'ceo@karios.com' : 'head@karios.com')}
+            <Text style={[styles.userName, { color: colors.text }]}>
+              {roleDisplay}
+            </Text>
+            <Text style={[styles.userEmail, { color: colors.textMuted }]}>
+              {user?.email}
             </Text>
           </View>
 
-          <View style={[styles.divider, { backgroundColor: isDark ? colors.surfaceBorder : '#f1f5f9' }]} />
+          {/* Light Line Divider */}
+          <View style={[styles.cardDivider, { backgroundColor: colors.surfaceBorder }]} />
 
-          {/* Role Section */}
-          <View style={styles.sectionBlock}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Role</Text>
-            <Text style={[styles.sectionValue, { color: colors.text }]}>{roleTitle}</Text>
+          {/* Organization Info Section */}
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+            ORGANIZATION INFO
+          </Text>
+
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: colors.textMuted }]}>Role</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.role || 'Staff'}</Text>
           </View>
 
-          {/* Access Level Section */}
-          <View style={styles.sectionBlock}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Access Level</Text>
-            <Text style={[styles.sectionValue, { color: colors.text }]}>{accessLevel}</Text>
+          <View style={styles.divider} />
+
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: colors.textMuted }]}>Department</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>
+              {departmentLabel(user?.department)}
+            </Text>
           </View>
 
-          {/* Permissions Section */}
-          <View style={styles.sectionBlock}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Permissions</Text>
-            <View style={styles.permissionsGrid}>
-              {permissions.map((perm) => (
-                <View
-                  key={perm}
-                  style={[
-                    styles.permPill,
-                    {
-                      backgroundColor: isDark ? 'rgba(139, 92, 246, 0.18)' : '#f3e8ff',
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.permPillText,
-                      { color: isDark ? '#c084fc' : '#8b5cf6' },
-                    ]}
-                  >
-                    {perm}
-                  </Text>
-                </View>
-              ))}
-            </View>
+          <View style={styles.divider} />
+
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: colors.textMuted }]}>System</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>Karios Daily Reporting</Text>
           </View>
 
-          {/* Sign Out Button Pattern from Image 2 */}
+          {/* Light Line Divider */}
+          <View style={[styles.cardDivider, { backgroundColor: colors.surfaceBorder }]} />
+
+          {/* Sign Out Button */}
           <TouchableOpacity
             style={[
               styles.signOutButton,
               {
                 backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#fee2e2',
-                borderColor: isDark ? 'rgba(239, 68, 68, 0.35)' : '#fca5a5',
+                borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#fca5a5',
               },
             ]}
             onPress={handleLogout}
@@ -166,67 +252,117 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 36,
+    paddingBottom: 40,
+    gap: 14,
   },
-  card: {
-    borderRadius: 20,
+  profileCard: {
+    borderRadius: 16,
     paddingHorizontal: 20,
     paddingTop: 28,
     paddingBottom: 24,
     borderWidth: 1,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  headerBlock: {
+  avatarContainer: {
     alignItems: 'center',
+    marginBottom: 4,
   },
   avatarCircle: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
-    shadowColor: '#8b5cf6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   avatarText: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: '800',
     color: '#ffffff',
   },
-  profileTitle: {
-    fontSize: 22,
+  userName: {
+    fontSize: 20,
     fontWeight: '800',
     letterSpacing: -0.3,
     marginBottom: 4,
   },
-  profileEmail: {
-    fontSize: 13,
-    fontWeight: '500',
+  userEmail: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  roleBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  roleBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  sectionCard: {
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginBottom: 14,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  infoLabel: {
+    fontSize: 14,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   divider: {
     height: 1,
-    marginVertical: 20,
+    backgroundColor: 'rgba(150, 150, 150, 0.1)',
+    marginVertical: 10,
   },
-  sectionBlock: {
-    marginBottom: 18,
+  signOutButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 12,
   },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-    marginBottom: 5,
-  },
-  sectionValue: {
-    fontSize: 15,
-    fontWeight: '800',
+  signOutButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
     letterSpacing: -0.2,
+  },
+  cardDivider: {
+    height: 1,
+    marginVertical: 18,
+  },
+  ceoFieldGroup: {
+    marginBottom: 16,
+  },
+  ceoFieldLabel: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+  ceoFieldValue: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   permissionsGrid: {
     flexDirection: 'row',
@@ -242,20 +378,5 @@ const styles = StyleSheet.create({
   permPillText: {
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.1,
-  },
-  signOutButton: {
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 14,
-  },
-  signOutButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.2,
   },
 });

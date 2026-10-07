@@ -51,12 +51,14 @@ export async function getExecutiveOverview(targetDate) {
       if (report.status === 'REJECTED') rejectedCount++;
 
       const blockerText = (report.blockers || report.data?.blockers || '').trim();
-      if (blockerText.length > 0) {
+      const isNone = /^(0|none|nil|no|n\/?a|nothing|-)$/i.test(blockerText);
+      if (blockerText.length > 0 && !isNone) {
         blockersList.push({
           department: dept.department,
           title: dept.title,
           blocker: blockerText,
           reportId: report.id,
+          status: report.status,
         });
       }
 
