@@ -165,15 +165,23 @@ export default function CeoReportDetailScreen({ route, navigation }) {
     return <LoadingScreen message="Loading report details..." />;
   }
 
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('CeoMain');
+    }
+  };
+
   if (!report) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <Header title="Report Details" onBack={() => navigation.goBack()} />
+        <Header title="Report Details" onBack={handleBack} />
         <View style={{ padding: 20 }}>
           <ErrorBanner message={error || 'Report not found.'} onRetry={fetchReport} />
           <TouchableOpacity
             style={[styles.goBackBtn, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
-            onPress={() => navigation.goBack()}
+            onPress={handleBack}
             activeOpacity={0.7}
           >
             <Ionicons name="arrow-back" size={16} color={colors.primary} />
@@ -198,7 +206,7 @@ export default function CeoReportDetailScreen({ route, navigation }) {
       <Header
         title={`${departmentLabel(deptKey)} Report`}
         subtitle={formatDate(currentReport.date || currentReport.created_at)}
-        onBack={() => navigation.goBack()}
+        onBack={handleBack}
       />
 
       <KeyboardAvoidingView
@@ -644,7 +652,6 @@ const styles = StyleSheet.create({
   },
   reviewedCommentText: {
     fontSize: 13,
-    fontStyle: 'italic',
     marginTop: 4,
   },
   reviewedDateText: {

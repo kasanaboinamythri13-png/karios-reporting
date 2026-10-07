@@ -82,6 +82,5 @@ const styles = StyleSheet.create({
   timeMissing: {
     fontSize: 11,
     marginTop: 8,
-    fontStyle: 'italic',
   },
 });
