@@ -37,17 +37,43 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const isCeo = user?.role === 'CEO';
-  const roleDisplay = isCeo ? 'CEO' : (user?.title || `${departmentLabel(user?.department)} Head`);
+  const roleTitle = isCeo ? 'CEO' : (user?.title || `${departmentLabel(user?.department)} Head`);
+  const accessLevel = isCeo
+    ? 'Full Admin Access — All Departments'
+    : `Department Head Access — ${departmentLabel(user?.department)}`;
+
+  const permissions = isCeo
+    ? [
+        'View All Reports',
+        'Approve Reports',
+        'Reject Reports',
+        'Dashboard Overview',
+      ]
+    : [
+        'Submit Daily Report',
+        'View Department History',
+        'Edit Pending Reports',
+        'Upload Attachments',
+      ];
+
+  const avatarLetter = isCeo
+    ? 'C'
+    : (user?.department?.charAt(0) || user?.name?.charAt(0) || 'H').toUpperCase();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <Header title="Account" />
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? colors.background : '#f4f6fa' }]}>
+      <Header
+        title="Profile"
+        subtitle="Account settings & permissions"
+        rightIcon={isDark ? 'sunny-outline' : 'moon-outline'}
+        onRightPress={toggleTheme}
+      />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile Card */}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Main Profile Card */}
         <View
           style={[
-            styles.profileCard,
+            styles.card,
             {
               backgroundColor: colors.surface,
               borderColor: colors.surfaceBorder,
@@ -55,118 +81,65 @@ export default function ProfileScreen({ navigation }) {
             },
           ]}
         >
-          <View style={styles.avatarContainer}>
-            <View
-              style={[
-                styles.avatarCircle,
-                {
-                  backgroundColor: colors.primary,
-                },
-              ]}
-            >
-              <Text style={styles.avatarText}>
-                {user?.name ? user.name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase() || 'U'}
-              </Text>
+          {/* Avatar & Header Identity */}
+          <View style={styles.headerBlock}>
+            <View style={[styles.avatarCircle, { backgroundColor: colors.primary }]}>
+              <Text style={styles.avatarText}>{avatarLetter}</Text>
             </View>
-            <Text style={[styles.userName, { color: colors.text }]}>
-              {user?.name || roleDisplay}
+            <Text style={[styles.profileTitle, { color: colors.text }]}>{roleTitle}</Text>
+            <Text style={[styles.profileEmail, { color: colors.textMuted }]}>
+              {user?.email || (isCeo ? 'ceo@karios.com' : 'head@karios.com')}
             </Text>
-            <Text style={[styles.userEmail, { color: colors.textMuted }]}>
-              {user?.email}
-            </Text>
-            <View style={[styles.roleBadge, { backgroundColor: isDark ? '#2d244a' : '#f3e8ff' }]}>
-              <Text style={[styles.roleBadgeText, { color: colors.primary }]}>
-                {roleDisplay}
-              </Text>
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: isDark ? colors.surfaceBorder : '#f1f5f9' }]} />
+
+          {/* Role Section */}
+          <View style={styles.sectionBlock}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Role</Text>
+            <Text style={[styles.sectionValue, { color: colors.text }]}>{roleTitle}</Text>
+          </View>
+
+          {/* Access Level Section */}
+          <View style={styles.sectionBlock}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Access Level</Text>
+            <Text style={[styles.sectionValue, { color: colors.text }]}>{accessLevel}</Text>
+          </View>
+
+          {/* Permissions Section */}
+          <View style={styles.sectionBlock}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Permissions</Text>
+            <View style={styles.permissionsGrid}>
+              {permissions.map((perm) => (
+                <View
+                  key={perm}
+                  style={[
+                    styles.permPill,
+                    {
+                      backgroundColor: isDark ? 'rgba(139, 92, 246, 0.18)' : '#f3e8ff',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.permPillText,
+                      { color: isDark ? '#c084fc' : '#8b5cf6' },
+                    ]}
+                  >
+                    {perm}
+                  </Text>
+                </View>
+              ))}
             </View>
           </View>
-        </View>
 
-        {/* Details Card */}
-        <View
-          style={[
-            styles.sectionCard,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.surfaceBorder,
-            },
-          ]}
-        >
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-            ORGANIZATION INFO
-          </Text>
-
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: colors.textMuted }]}>Role</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.role || 'Staff'}</Text>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: colors.textMuted }]}>Department</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>
-              {isCeo ? 'CEO Office' : departmentLabel(user?.department)}
-            </Text>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <Text style={[styles.infoLabel, { color: colors.textMuted }]}>System</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>Karios Daily Reporting</Text>
-          </View>
-        </View>
-
-        {/* Settings & Appearance */}
-        <View
-          style={[
-            styles.sectionCard,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.surfaceBorder,
-            },
-          ]}
-        >
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-            APPEARANCE
-          </Text>
-
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={toggleTheme}
-            activeOpacity={0.7}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons
-                name={isDark ? 'moon' : 'sunny'}
-                size={20}
-                color={colors.primary}
-              />
-              <Text style={[styles.settingLabel, { color: colors.text }]}>Dark Mode</Text>
-            </View>
-            <Text style={[styles.settingValue, { color: colors.primary, fontWeight: '700' }]}>
-              {isDark ? 'Enabled' : 'Disabled'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Actions Card */}
-        <View
-          style={[
-            styles.sectionCard,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.surfaceBorder,
-            },
-          ]}
-        >
+          {/* Sign Out Button Pattern from Image 2 */}
           <TouchableOpacity
             style={[
               styles.signOutButton,
               {
                 backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#fee2e2',
-                borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#fca5a5',
+                borderColor: isDark ? 'rgba(239, 68, 68, 0.35)' : '#fca5a5',
               },
             ]}
             onPress={handleLogout}
@@ -193,113 +166,95 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
-    gap: 14,
+    paddingBottom: 36,
   },
-  profileCard: {
-    borderRadius: 16,
+  card: {
+    borderRadius: 20,
     paddingHorizontal: 20,
     paddingTop: 28,
     paddingBottom: 24,
     borderWidth: 1,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  avatarContainer: {
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  avatarCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowRadius: 12,
     elevation: 3,
   },
+  headerBlock: {
+    alignItems: 'center',
+  },
+  avatarCircle: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   avatarText: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: '800',
     color: '#ffffff',
   },
-  userName: {
-    fontSize: 20,
+  profileTitle: {
+    fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.3,
     marginBottom: 4,
   },
-  userEmail: {
+  profileEmail: {
     fontSize: 13,
-    marginBottom: 12,
-  },
-  roleBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  roleBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  sectionCard: {
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    marginBottom: 14,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  infoLabel: {
-    fontSize: 14,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  settingLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  settingValue: {
-    fontSize: 13,
+    fontWeight: '500',
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(150, 150, 150, 0.1)',
-    marginVertical: 10,
+    marginVertical: 20,
+  },
+  sectionBlock: {
+    marginBottom: 18,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    marginBottom: 5,
+  },
+  sectionValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  permissionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
+  permPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  permPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
   signOutButton: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingVertical: 12,
+    marginTop: 14,
   },
   signOutButtonText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
