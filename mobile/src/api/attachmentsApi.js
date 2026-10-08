@@ -3,6 +3,8 @@
 
 import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../config/api.config';
+import { getStoredAuthToken } from '../services/api';
 
 export const ALLOWED_TYPES = {
   'image/jpeg': ['.jpg', '.jpeg'],
@@ -66,9 +68,8 @@ export function formatFileSize(bytes) {
  * Returns { attachmentId, fileName, mimeType, sizeBytes }.
  */
 export async function uploadAttachment(asset) {
-  const token = await AsyncStorage.getItem('karios_token');
-  const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:4000/api';
-  const url = `${baseUrl}/attachments`;
+  const token = await getStoredAuthToken();
+  const url = `${API_BASE_URL}/attachments`;
   const fileName = asset.name || 'attachment';
   const mimeType = getNormalizedMimeType(asset) || 'application/octet-stream';
 

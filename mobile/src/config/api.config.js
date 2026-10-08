@@ -14,7 +14,7 @@ import { Platform } from 'react-native';
  */
 
 // If you have a deployed backend URL, put it here:
-const DEPLOYED_BACKEND_URL = '';
+const DEPLOYED_BACKEND_URL = 'https://066j0wz2-4000.inc1.devtunnels.ms/api';
 
 const LOCAL_DEV_URL = Platform.select({
   android: 'http://10.0.2.2:4000/api',
@@ -22,7 +22,7 @@ const LOCAL_DEV_URL = Platform.select({
   default: 'http://localhost:4000/api',
 });
 
-export const API_BASE_URL = DEPLOYED_BACKEND_URL || LOCAL_DEV_URL;
+export const API_BASE_URL = DEPLOYED_BACKEND_URL || process.env.EXPO_PUBLIC_API_URL || LOCAL_DEV_URL;
 
 /**
  * Toggle between Mock Mode and Live Backend Mode for UI testing.
