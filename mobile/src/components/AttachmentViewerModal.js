@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 import { API_BASE_URL } from '../config/api.config';
 import { getStoredAuthToken } from '../services/api';
@@ -163,8 +164,8 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
     };
   }, [visible, attachment]);
 
-  // Handle native Open / Share via expo-sharing
-  const handleOpenOrShare = async () => {
+  // Handle opening PDF directly in the device's native PDF Viewer (not the Share sheet)
+  const handleViewPdf = async () => {
     if (!localUri) {
       Alert.alert('Notice', 'File is still preparing. Please wait a moment.');
       return;
@@ -172,19 +173,22 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
 
     try {
       setActionLoading(true);
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) {
-        Alert.alert('Sharing Unavailable', 'File sharing is not supported on this device.');
-        return;
+      if (Platform.OS === 'android') {
+        const contentUri = await FileSystem.getContentUriAsync(localUri);
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          flags: 1, // Intent.FLAG_GRANT_READ_URI_PERMISSION
+          type: attachment?.mimeType || (isPdf ? 'application/pdf' : 'application/octet-stream'),
+        });
+      } else {
+        await Sharing.shareAsync(localUri, {
+          mimeType: attachment?.mimeType || (isPdf ? 'application/pdf' : 'application/octet-stream'),
+          dialogTitle: `View ${fileName}`,
+          UTI: isPdf ? 'com.adobe.pdf' : undefined,
+        });
       }
-
-      await Sharing.shareAsync(localUri, {
-        mimeType: attachment?.mimeType || (isPdf ? 'application/pdf' : 'application/octet-stream'),
-        dialogTitle: `Open ${fileName}`,
-        UTI: isPdf ? 'com.adobe.pdf' : undefined,
-      });
     } catch (err) {
-      Alert.alert('Could Not Open File', err?.message || 'An error occurred while opening the file.');
+      Alert.alert('Unable to View PDF', err?.message || 'No PDF viewer app found on device.');
     } finally {
       setActionLoading(false);
     }
@@ -223,22 +227,6 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
             </View>
 
             <View style={styles.headerActions}>
-              {localUri && !loading && !error && (
-                <TouchableOpacity
-                  style={styles.actionIconBtn}
-                  onPress={handleOpenOrShare}
-                  disabled={actionLoading}
-                  activeOpacity={0.7}
-                  accessibilityLabel="Share or Open File"
-                >
-                  {actionLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Ionicons name="share-outline" size={20} color="#FFFFFF" />
-                  )}
-                </TouchableOpacity>
-              )}
-
               <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
                 <Ionicons name="close" size={24} color="#FFFFFF" />
               </TouchableOpacity>
@@ -309,7 +297,7 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
                 <View style={styles.pdfActions}>
                   <TouchableOpacity
                     style={styles.openPdfBtn}
-                    onPress={handleOpenOrShare}
+                    onPress={handleViewPdf}
                     disabled={actionLoading}
                     activeOpacity={0.8}
                   >
@@ -317,14 +305,14 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <>
-                        <Ionicons name="open-outline" size={20} color="#FFFFFF" />
-                        <Text style={styles.openPdfBtnText}>Open / View PDF</Text>
+                        <Ionicons name="eye-outline" size={20} color="#FFFFFF" />
+                        <Text style={styles.openPdfBtnText}>View PDF</Text>
                       </>
                     )}
                   </TouchableOpacity>
 
                   <Text style={styles.pdfHelpText}>
-                    Opens in your device's PDF viewer (Google Drive, Adobe Acrobat, etc.)
+                    Opens directly in your default PDF viewer
                   </Text>
                 </View>
               </View>
@@ -335,11 +323,11 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
                 {localUri && (
                   <TouchableOpacity
                     style={[styles.openPdfBtn, { marginTop: 20 }]}
-                    onPress={handleOpenOrShare}
+                    onPress={handleViewPdf}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="open-outline" size={20} color="#FFFFFF" />
-                    <Text style={styles.openPdfBtnText}>Open File</Text>
+                    <Ionicons name="eye-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.openPdfBtnText}>View Document</Text>
                   </TouchableOpacity>
                 )}
               </View>
