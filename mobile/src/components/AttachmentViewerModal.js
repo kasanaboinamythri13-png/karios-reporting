@@ -11,10 +11,12 @@ import {
   Dimensions,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { API_BASE_URL } from '../config/api.config';
 import { getStoredAuthToken } from '../services/api';
 import { formatFileSize } from '../api/attachmentsApi';
@@ -22,15 +24,17 @@ import { formatFileSize } from '../api/attachmentsApi';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function AttachmentViewerModal({ visible, onClose, attachment }) {
-  const [imageUri, setImageUri] = useState(null);
+  const [localUri, setLocalUri] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [imageDecoding, setImageDecoding] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const fileName =
     attachment?.fileName ||
     attachment?.filename ||
     attachment?.name ||
-    'attachment.png';
+    'attachment';
 
   const isImage =
     attachment?.mimeType?.startsWith('image/') ||
@@ -42,98 +46,111 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
 
   useEffect(() => {
     if (!visible || !attachment) {
-      setImageUri(null);
+      setLocalUri(null);
       setLoading(false);
+      setImageDecoding(true);
       setError(null);
       return;
     }
 
     let isMounted = true;
     setLoading(true);
+    setImageDecoding(true);
     setError(null);
 
     async function loadFile() {
       try {
         const token = await getStoredAuthToken();
         const attId = attachment.id || attachment.attachmentId;
-        const remoteUrl = `${API_BASE_URL}/attachments/${attId}/file`;
 
-        // If not an image, we still prepare url for preview
-        if (!isImage) {
+        // If attachment already has a local file URI (e.g., picked locally before upload)
+        if (attachment.uri && (attachment.uri.startsWith('file://') || attachment.uri.startsWith('content://'))) {
           if (isMounted) {
-            setImageUri(remoteUrl);
+            setLocalUri(attachment.uri);
             setLoading(false);
           }
           return;
         }
 
-        // 1. Try local cache / download via FileSystem
-        try {
-          const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-          const cachePath = `${FileSystem.cacheDirectory || ''}att_${attId}_${safeName}`;
-          const fileInfo = await FileSystem.getInfoAsync(cachePath);
+        const remoteUrl = (attachment.url && attachment.url.startsWith('http'))
+          ? attachment.url
+          : `${API_BASE_URL}/attachments/${attId}/file`;
 
+        const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const cacheDir = FileSystem.cacheDirectory || '';
+        const cachePath = `${cacheDir}att_${attId || 'preview'}_${safeName}`;
+
+        // 1. Try local cache
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(cachePath);
           if (fileInfo.exists && fileInfo.size > 0) {
             if (isMounted) {
-              setImageUri(cachePath);
+              setLocalUri(cachePath);
               setLoading(false);
-              return;
             }
+            return;
           }
+        } catch {
+          // Cache check failed, continue to download
+        }
 
+        // 2. Download via FileSystem with auth headers
+        try {
           const dl = await FileSystem.downloadAsync(remoteUrl, cachePath, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
 
           if (dl && dl.status >= 200 && dl.status < 300) {
             if (isMounted) {
-              setImageUri(dl.uri);
+              setLocalUri(dl.uri);
               setLoading(false);
-              return;
             }
+            return;
           }
         } catch (fsErr) {
-          console.warn('[AttachmentViewer] FileSystem download fallback:', fsErr.message);
+          console.warn('[AttachmentViewer] FileSystem download fallback:', fsErr?.message);
         }
 
-        // 2. Fallback: fetch blob and convert to data URL
-        try {
-          const resp = await fetch(remoteUrl, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          });
+        // 3. Fallback: fetch blob and convert to data URL (for images)
+        if (isImage) {
+          try {
+            const resp = await fetch(remoteUrl, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
 
-          if (!resp.ok) {
-            throw new Error(`Failed to fetch file (HTTP ${resp.status})`);
+            if (!resp.ok) {
+              throw new Error(`Server returned HTTP ${resp.status}`);
+            }
+
+            const blob = await resp.blob();
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              if (isMounted) {
+                setLocalUri(reader.result);
+                setLoading(false);
+              }
+            };
+            reader.onerror = () => {
+              if (isMounted) {
+                setError('Failed to render image.');
+                setLoading(false);
+              }
+            };
+            reader.readAsDataURL(blob);
+            return;
+          } catch (fetchErr) {
+            console.warn('[AttachmentViewer] Fetch fallback failed:', fetchErr?.message);
           }
-
-          const blob = await resp.blob();
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            if (isMounted) {
-              setImageUri(reader.result);
-              setLoading(false);
-            }
-          };
-          reader.onerror = () => {
-            if (isMounted) {
-              setError('Failed to render image.');
-              setLoading(false);
-            }
-          };
-          reader.readAsDataURL(blob);
-          return;
-        } catch (fetchErr) {
-          console.warn('[AttachmentViewer] Fetch fallback failed:', fetchErr.message);
         }
 
-        // 3. Fallback: direct remote URI with auth headers
+        // 4. Fallback: direct remote URI
         if (isMounted) {
-          setImageUri(remoteUrl);
+          setLocalUri(remoteUrl);
           setLoading(false);
         }
       } catch (err) {
         if (isMounted) {
-          setError(err.message || 'Could not load attachment.');
+          setError(err?.message || 'Could not load attachment.');
           setLoading(false);
         }
       }
@@ -145,6 +162,33 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
       isMounted = false;
     };
   }, [visible, attachment]);
+
+  // Handle native Open / Share via expo-sharing
+  const handleOpenOrShare = async () => {
+    if (!localUri) {
+      Alert.alert('Notice', 'File is still preparing. Please wait a moment.');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Sharing Unavailable', 'File sharing is not supported on this device.');
+        return;
+      }
+
+      await Sharing.shareAsync(localUri, {
+        mimeType: attachment?.mimeType || (isPdf ? 'application/pdf' : 'application/octet-stream'),
+        dialogTitle: `Open ${fileName}`,
+        UTI: isPdf ? 'com.adobe.pdf' : undefined,
+      });
+    } catch (err) {
+      Alert.alert('Could Not Open File', err?.message || 'An error occurred while opening the file.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   if (!visible) return null;
 
@@ -178,9 +222,27 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
               </View>
             </View>
 
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-              <Ionicons name="close" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              {localUri && !loading && !error && (
+                <TouchableOpacity
+                  style={styles.actionIconBtn}
+                  onPress={handleOpenOrShare}
+                  disabled={actionLoading}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Share or Open File"
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Ionicons name="share-outline" size={20} color="#FFFFFF" />
+                  )}
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
+                <Ionicons name="close" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Main Content Area */}
@@ -188,7 +250,9 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
             {loading ? (
               <View style={styles.centerContainer}>
                 <ActivityIndicator size="large" color="#a78bfa" />
-                <Text style={styles.loadingText}>Loading attachment...</Text>
+                <Text style={styles.loadingText}>
+                  {isPdf ? 'Preparing PDF...' : 'Loading attachment...'}
+                </Text>
               </View>
             ) : error ? (
               <View style={styles.centerContainer}>
@@ -199,7 +263,7 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
                   <Text style={styles.retryBtnText}>Close</Text>
                 </TouchableOpacity>
               </View>
-            ) : isImage && imageUri ? (
+            ) : isImage && localUri ? (
               <ScrollView
                 style={styles.imageScroll}
                 contentContainerStyle={styles.imageScrollContent}
@@ -208,30 +272,76 @@ export default function AttachmentViewerModal({ visible, onClose, attachment }) 
                 showsHorizontalScrollIndicator={false}
                 showsVerticalScrollIndicator={false}
               >
-                <Image
-                  source={{ uri: imageUri }}
-                  style={styles.image}
-                  resizeMode="contain"
-                  onLoadStart={() => setLoading(true)}
-                  onLoadEnd={() => setLoading(false)}
-                  onError={() => setError('Failed to display image.')}
-                />
+                <View style={styles.imageWrapper}>
+                  {imageDecoding && (
+                    <View style={styles.imageLoaderOverlay}>
+                      <ActivityIndicator size="large" color="#a78bfa" />
+                      <Text style={styles.decodingText}>Rendering image...</Text>
+                    </View>
+                  )}
+                  <Image
+                    source={{ uri: localUri }}
+                    style={styles.image}
+                    resizeMode="contain"
+                    onLoadEnd={() => setImageDecoding(false)}
+                    onError={() => {
+                      setImageDecoding(false);
+                      setError('Failed to display image.');
+                    }}
+                  />
+                </View>
               </ScrollView>
             ) : isPdf ? (
-              <View style={styles.centerContainer}>
+              <View style={styles.pdfCardContainer}>
                 <View style={styles.pdfIconCircle}>
-                  <Ionicons name="document-text" size={54} color="#EF4444" />
+                  <Ionicons name="document-text" size={60} color="#EF4444" />
                 </View>
-                <Text style={styles.pdfTitle}>{fileName}</Text>
+                <Text style={styles.pdfTitle} numberOfLines={2}>
+                  {fileName}
+                </Text>
                 <Text style={styles.pdfSubtitle}>PDF Document</Text>
                 {Boolean(attachment?.sizeBytes) && (
-                  <Text style={styles.fileSizeText}>{formatFileSize(attachment.sizeBytes)}</Text>
+                  <Text style={styles.fileSizeBadge}>
+                    {formatFileSize(attachment.sizeBytes)}
+                  </Text>
                 )}
+
+                <View style={styles.pdfActions}>
+                  <TouchableOpacity
+                    style={styles.openPdfBtn}
+                    onPress={handleOpenOrShare}
+                    disabled={actionLoading}
+                    activeOpacity={0.8}
+                  >
+                    {actionLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="open-outline" size={20} color="#FFFFFF" />
+                        <Text style={styles.openPdfBtnText}>Open / View PDF</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <Text style={styles.pdfHelpText}>
+                    Opens in your device's PDF viewer (Google Drive, Adobe Acrobat, etc.)
+                  </Text>
+                </View>
               </View>
             ) : (
               <View style={styles.centerContainer}>
                 <Ionicons name="document-outline" size={54} color="#94A3B8" />
                 <Text style={styles.pdfTitle}>{fileName}</Text>
+                {localUri && (
+                  <TouchableOpacity
+                    style={[styles.openPdfBtn, { marginTop: 20 }]}
+                    onPress={handleOpenOrShare}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="open-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.openPdfBtnText}>Open File</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </View>
@@ -262,15 +372,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: 16,
+    marginRight: 12,
     gap: 12,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(124, 58, 237, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   titleCol: {
     flex: 1,
   },
   fileNameText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   fileSizeText: {
@@ -314,6 +439,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 6,
     marginBottom: 20,
+    paddingHorizontal: 16,
   },
   retryBtn: {
     paddingHorizontal: 20,
@@ -336,28 +462,99 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 10,
   },
+  imageWrapper: {
+    width: SCREEN_WIDTH - 20,
+    height: SCREEN_HEIGHT * 0.75,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageLoaderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    borderRadius: 8,
+    zIndex: 10,
+  },
+  decodingText: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    marginTop: 8,
+  },
   image: {
     width: SCREEN_WIDTH - 20,
     height: SCREEN_HEIGHT * 0.75,
   },
-  pdfIconCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  pdfCardContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    padding: 24,
+    maxWidth: SCREEN_WIDTH - 40,
+  },
+  pdfIconCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
   },
   pdfTitle: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     textAlign: 'center',
+    marginBottom: 6,
   },
   pdfSubtitle: {
     color: '#94A3B8',
     fontSize: 14,
+    marginBottom: 6,
+  },
+  fileSizeBadge: {
+    color: '#A78BFA',
+    fontSize: 13,
+    fontWeight: '600',
+    backgroundColor: 'rgba(124, 58, 237, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 24,
+  },
+  pdfActions: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 12,
+  },
+  openPdfBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#7C3AED',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 12,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    minWidth: 200,
+  },
+  openPdfBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  pdfHelpText: {
+    color: '#64748B',
+    fontSize: 12,
+    textAlign: 'center',
     marginTop: 4,
   },
 });
+
